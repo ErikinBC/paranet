@@ -11,7 +11,6 @@ Classes to support parametric survival probability distributions
 
 # External modules
 import numpy as np
-import pandas as pd
 
 # Internal modules
 from utils import param2array, len_of_none, t_long, t_wide
@@ -19,7 +18,9 @@ from utils import param2array, len_of_none, t_long, t_wide
 # List of currently supported distributions
 dist_valid = ['exponential', 'weibull', 'gompertz']
 
+
 def check_dist_str(dist:str) -> None:
+    """CHECK THAT STRING BELONGS TO VALID DISTRIBUTION"""
     assert isinstance(dist, str)
     assert dist in dist_valid, f'dist must be one of: {", ".join(dist_valid)}'
 
@@ -70,6 +71,48 @@ def pdf(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> n
     return f
 
 
+def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int) -> np.ndarray:
+    """
+    GENERATES n_sim RANDOM SAMPLES FROM A GIVEN DISTRIBUTION
+
+    Inputs
+    ------
+    n_sim:              Integer indicating the number of samples to generate
+    k:                  The dimensionality of the scale/shape parameter
+    seed:               Reproducibility seed
+    See hazard() for remaining parameters
+
+    Returns
+    -------
+    (n_sim x k) np.ndarray
+    """
+    if seed is not None:
+        np.random.seed(seed)
+    nlU = -np.log(np.random.rand(n_sim, k))
+    if dist == 'exponential':
+        T = nlU / scale
+    if dist == 'weibull':
+        T = (nlU / scale) ** (1/shape)
+    if dist == 'gompertz':
+        T = 1/shape * np.log(1 - (shape*nlU)/(scale))
+    return T
+
+
+def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
+    """
+    CALCULATES THE QUANTILE FUNCTION FOR THE RELEVANT CLASSES (SEE HAZARD)
+    """
+    check_dist_str(dist)
+    nlp = -np.log(1 - t_long(p))
+    if dist == 'exponential':
+        T = nlp / scale
+    if dist == 'weibull':
+        T = (nlp / scale) ** (1/shape)
+    if dist == 'gompertz':
+        T = 1/shape * np.log(1 - (shape*nlp)/(scale))
+    return T
+
+
 class base_dist():
     def __init__(self, dist:str, scale:float or np.ndarray or None=None, shape:float or np.ndarray or None=None) -> None:
         """
@@ -99,23 +142,26 @@ class base_dist():
         # Put the shape/scales as 1xK
         self.scale = t_wide(self.scale)
         self.shape = t_wide(self.shape)
+        self.k = self.scale.shape[1]
 
     def check_t(self, t):
         assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'
 
     def hazard(self, t):
-        h = hazard(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
-        return h
+        return hazard(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 
     def survival(self, t):
-        h = survival(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
-        return h
+        return survival(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 
     def pdf(self, t):
-        f = pdf(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
-        return f
+        return pdf(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 
-    def rvs(self, n_sim, n_exper):
-        1
+    def rvs(self, n_sim:int, seed:None or int=None):
+        """INVERTED-CDF APPROACH"""
+        return rvs(n_sim=n_sim, k=self.k, scale=self.scale, shape=self.shape, dist=self.dist, seed=seed)
+
+    def quantile(self, p:float or np.ndarray):
+        return quantile(p, self.scale, self.shape, self.dist)
+
 
 

@@ -13,9 +13,12 @@ def t_wide(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
         return x
     if not isinstance(x, np.ndarray):
         x = np.array(x)
-    if len(x.shape) > 1:
-        return x
-    return x.reshape([1, max(x.shape)])
+    n_shape = len(x.shape)
+    if n_shape == 0:
+        x = x.reshape([1, 1])
+    if n_shape == 1:
+        x = x.reshape([1, max(x.shape)])
+    return x
 
 
 def t_long(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
