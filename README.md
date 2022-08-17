@@ -12,8 +12,6 @@ The five distributions are currently supported:
 
 This package was built with a specific conda environment and developers can use `conda env create -f paranet.yml` and then `source paranet`.
 
-Unittests can be implemented with `python3 -m pytest tests`.
-
 See the parameterization section to understand how 
 
 ## (1) Probability distribution parameterization

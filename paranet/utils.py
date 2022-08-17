@@ -16,12 +16,59 @@ def check_dist_str(dist:str) -> None:
     assert dist in dist_valid, f'dist must be one of: {", ".join(dist_valid)}'
 
 
-def format_t_d_scale_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str):
+def is_vector(x:np.ndarray) -> None:
+    """CHECKS THAT ARRAY HAS AT MOST POSSIBLE DIMENSION"""
+    n_shape = len(x.shape)
+    if n_shape <= 1:  # Scale or vector
+        check = True
+    elif n_shape == 2:
+        if x.shape[1] == 1:
+            check = False  # Is (k,1)
+        else:
+            check = False  # Is (p,k), k>1
+    else:  # Must have 3 or more dimensions
+        check = False
+    assert check, 'Dimensionality not as expected'
+
+
+def get_p_k(t:np.ndarray) -> tuple[int, int]:
+    """
+    RETURN THE DIMENSIONALITY OF THE DATA INPUT ARRAY
+
+    *NOTE, WHEN WE MOVE TO COVARIATES, INPUT WILL NEED TO CHANGE TO X
+    """
+    n_shape = len(t.shape)
+    assert n_shape <= 2, 'Time-to-event can have at most 2-dimensions'
+    if n_shape <= 1:
+        k, p = 1, 2
+    else:
+        k, p = t.shape[1], 2
+    return p, k
+
+
+def shape_scale_2vec(shape_scale:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    SPLIT THE [p,k] matrix into a [1,k] and [p-1,k] row vector/matrix
+    """
+    shape, scale = t_wide(shape_scale[0]), t_wide(shape_scale[1:])
+    return shape, scale
+
+
+def format_t_d(t:np.ndarray, d:np.ndarray, dist:str) -> tuple[np.ndarray, np.ndarray]:
     """
     ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
     """
     check_dist_str(dist)
     t_vec, d_vec = t_long(t), t_long(d)
+    assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be teh same size'
+    return t_vec, d_vec
+
+
+def format_t_d_scale_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)  -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
+    """
+    t_vec, d_vec = format_t_d(t, d, dist)
     scale, shape = t_wide(scale), t_wide(shape)
     return t_vec, d_vec, scale, shape
 
