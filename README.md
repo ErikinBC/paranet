@@ -1,14 +1,18 @@
 # Parametric survival models
 
-This repo provides `sklearn`-like classes to carry out (regularized) linear parametric survival regression.
+This repo provides `sklearn`-like classes to carry out (regularized) linear parametric survival regression. 
 
 The five distributions are currently supported:
 
 1. Exponential
 2. Weibull
 3. Gompertz
-4. Lognormal
-5. Log-logistic
+4. Lognormal (UNDER-DEVELOPMENT)
+5. Log-logistic (UNDER-DEVELOPMENT)
+
+This package was built with a specific conda environment and developers can use `conda env create -f paranet.yml` and then `source paranet`.
+
+Unittests can be implemented with `python3 -m pytest tests`.
 
 See the parameterization section to understand how 
 

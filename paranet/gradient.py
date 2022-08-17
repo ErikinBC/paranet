@@ -6,7 +6,7 @@ GRADIENT METHODS FOR MLL FITTING
 import numpy as np
 
 # Internal modules
-from utils import format_t_d_scale_shape
+from paranet.utils import format_t_d_scale_shape
 
 
 def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str):

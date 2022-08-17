@@ -13,7 +13,7 @@ Classes to support parametric survival probability distributions
 import numpy as np
 
 # Internal modules
-from utils import param2array, len_of_none, t_long, t_wide, check_dist_str
+from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str
 
 
 def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
