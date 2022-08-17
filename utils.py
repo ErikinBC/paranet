@@ -6,6 +6,25 @@ UTILITY FUNCTIONS
 import numpy as np
 import pandas as pd
 
+# List of currently supported distributions
+dist_valid = ['exponential', 'weibull', 'gompertz']
+
+
+def check_dist_str(dist:str) -> None:
+    """CHECK THAT STRING BELONGS TO VALID DISTRIBUTION"""
+    assert isinstance(dist, str)
+    assert dist in dist_valid, f'dist must be one of: {", ".join(dist_valid)}'
+
+
+def format_t_d_scale_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str):
+    """
+    ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
+    """
+    check_dist_str(dist)
+    t_vec, d_vec = t_long(t), t_long(d)
+    scale, shape = t_wide(scale), t_wide(shape)
+    return t_vec, d_vec, scale, shape
+
 
 def t_wide(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
     """CONVERT 1D ARRAY OR FLOAT TO A 1xK VECTOR"""
@@ -23,7 +42,16 @@ def t_wide(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
 
 def t_long(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
     """CONVERT 1D ARRAY OR FLOAT TO A Kx1 VECTOR"""
-    return t_wide(x).T
+    if x is None:
+        return x
+    if not isinstance(x, np.ndarray):
+        x = np.array(x)
+    n_shape = len(x.shape)
+    if n_shape == 0:
+        x = x.reshape([1, 1])
+    if n_shape == 1:
+        x = x.reshape([max(x.shape), 1])
+    return x
 
 
 def len_of_none(x:np.ndarray or None) -> int:
