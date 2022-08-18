@@ -131,3 +131,108 @@ def param2array(x:float or np.ndarray or pd.Series) -> np.ndarray:
         check = False
     assert check, 'Input is not a float or coerible'
     return x
+
+def coerce_to_Series(x):
+    """
+    Try to coerce an object x to a pd.Series. Currently supported for strings, integers, floats, lists, numpy arrays, and None's. 
+    """
+    if not isinstance(x, pd.Series):
+        if isinstance(x, str) or isinstance(x, float) or isinstance(x, int):
+            x = [x]
+        elif isinstance(x, np.ndarray) or isinstance(x, list):
+            if len(x) == 0:
+                x = pd.Series(x, dtype=object)
+            else:
+                x = pd.Series(x)
+        else:
+            if len(x) > 0:  # Possible an index or some other pandas array
+                x = pd.Series(x)
+            elif x == None:
+                x = pd.Series([], dtype=object)
+            else:
+                assert False, 'How did we get here??'
+    return x
+
+
+def check_type(x, tt: type, name: str=None):
+    """
+    Function checks whether object is of type tt, with variable named name
+
+    Input
+    -----
+    x:         Any object
+    tt:        Valid type for isinstance
+    name:      Name of x (optional)
+    """
+    if name is None:
+        name = 'x'
+    assert isinstance(x, tt), f'{name} was not found to be: {tt}'
+
+
+def vstack_pd(x: pd.DataFrame, y: pd.DataFrame, drop_idx=True) -> pd.DataFrame:
+    """Quick wrapper to vertically stack two dataframes"""
+    z = pd.concat(objs=[x, y], axis=0)
+    if drop_idx:
+        z.reset_index(drop=True, inplace=True)
+    return z
+
+
+def hstack_pd(x: pd.DataFrame, y: pd.DataFrame, drop_x:bool=True) -> pd.DataFrame:
+    """
+    Function allows for horizontal concatenation of two dataframes. If x and y share columns, then the columns from y will be favoured
+    """
+    check_type(x, pd.DataFrame, 'x')
+    check_type(y, pd.DataFrame, 'y')
+    cn_drop = list(intersect(x.columns, y.columns))
+    if len(cn_drop) > 0:
+        if drop_x:
+            x = x.drop(columns=cn_drop)
+        else:
+            y = y.drop(columns=cn_drop)
+    z = pd.concat(objs=[x, y], axis=1)
+    return z
+
+
+
+def setdiff(x: pd.Series, y: pd.Series):
+    """R-like equivalent using pandas instead of numpy"""
+    x = coerce_to_Series(x)
+    y = coerce_to_Series(y)
+    z = x[~x.isin(y)].reset_index(drop=True)
+    return z
+
+def intersect(x: pd.Series, y: pd.Series):
+    """R-like equivalent using pandas instead of numpy"""
+    x = coerce_to_Series(x)
+    y = coerce_to_Series(y)
+    z = x[x.isin(y)].reset_index(drop=True)
+    return z
+
+
+def str_subset(x:pd.Series, pat: str, regex:bool=True, case:bool=True, na:bool=False, neg:bool=False) -> pd.Series:
+    """
+    R-like regex string subset
+    
+    Input
+    -----
+    x:          Some array that can be converted to a pd.Series
+    pat:        Some (regular expression) pattern to detect in x
+    regex:      Should pattern be treated as regular expresson?
+    case:       Should pattern be case-sensitive?
+    na:         How should missing values be treated as matches?
+    neg:        Should we the match be reversed?
+
+    Returns
+    ------
+    A subset of x that matches pat
+    """
+    x = coerce_to_Series(x)
+    if not x.dtype == object:
+        x = x.astype(str)
+    idx = x.str.contains(pat, regex=regex, case=case, na=na)
+    if neg:
+        z = x[~idx]
+    else:   
+        z = x[idx]
+    z.reset_index(drop=True, inplace=True)
+    return z

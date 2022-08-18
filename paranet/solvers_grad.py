@@ -15,8 +15,7 @@ from scipy.optimize import minimize
 
 # Internal modules
 from paranet.gradient import grad_ll, log_lik
-from paranet.dists import surv_dist
-from paranet.utils import t_wide, format_t_d, is_vector, shape_scale_2vec, get_p_k
+from paranet.utils import is_vector, shape_scale_2vec, get_p_k
 
 def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) -> float:
     """
@@ -71,7 +70,6 @@ def grad_ll_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) ->
     return grad_vec
 
 
-# t=T_dist;d=D_dist;x0=init_coef.copy()
 def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str, x0:None or np.ndarray=None):
     """
     CARRIES OUT OPTIMIZATION FOR GRADIENT-BASED METHOD
@@ -96,20 +94,13 @@ def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str, x0:None or np.ndar
     except:
         print('log_lik_vec failed')
     # Run the optimizer
-    breakpoint()
-    minimize(fun=log_lik_vec, x0=x0, method='L-BFGS-B', jac=grad_ll_vec, args=(t, d, dist))
+    opt = minimize(fun=log_lik_vec, x0=x0, method='L-BFGS-B', jac=grad_ll_vec, args=(t, d, dist))
+    # Check for convergence
+    assert opt.success, f'Optimization did not converge: {opt.message}'
+    # Return in (p,k) format
+    shape_scale = opt.x.reshape([k,p]).T
+    return shape_scale
 
-
-# GENERATE A REPRESENTATIVE SAMPLE (I.E. QUANTILES) OR DATA
-n_sim, seed = 99, 1
-dist = 'exponential'
-lam = np.array([0.5, 1, 1.5])
-k = len(lam)
-D_dist = np.zeros([n_sim, k],dtype=int) + 1
-gen_dist = surv_dist(dist, scale=lam)
-T_dist = gen_dist.quantile(p=np.arange(0.01,1,0.01))
-init_coef = np.vstack([np.zeros(k), lam])
-wrapper_grad_ll(T_dist, D_dist, dist, init_coef)
 
 
 

@@ -31,7 +31,7 @@ def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or No
     if dist == 'weibull':
         ll = -np.mean(d_vec*(np.log(shape*scale) + (shape-1)*np.log(t_vec)) - scale*t_vec**shape, axis=0)
     if dist == 'gompertz':
-        ll = -np.mean(d_vec*np.log(scale) - scale/shape*(np.exp(shape*t_vec)-1), axis=0)
+        ll = -np.mean(d_vec*(np.log(scale)+shape*t_vec) - scale/shape*(np.exp(shape*t_vec)-1), axis=0)
     return ll
 
 
@@ -72,7 +72,7 @@ def grad_ll_scale(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray
     if dist == 'weibull':
         dll = -np.mean(d_vec/scale - t_vec**shape, axis=0)
     if dist == 'gompertz':
-        dll = -np.mean(d_vec/scale - np.exp(shape*t_vec)/shape + 1/shape, axis=0)
+        dll = -np.mean(d_vec/scale - (np.exp(shape*t_vec) - 1)/shape, axis=0)
     return dll
 
 
@@ -94,7 +94,7 @@ def grad_ll_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray
     if dist == 'weibull':
         dll = -np.mean( d_vec*(1/shape + np.log(t_vec)) - scale*t_vec**shape*np.log(t_vec), axis=0)
     if dist == 'gompertz':
-        dll = -np.mean(scale/shape*(np.exp(shape*t_vec)*(1/shape-t_vec) - 1/shape), axis=0)
+        dll = -np.mean( d_vec*t_vec - (scale/shape**2)*(np.exp(shape*t_vec)*(shape*t_vec-1) +1), axis=0)
     return dll
 
 

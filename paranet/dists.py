@@ -85,7 +85,7 @@ def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, 
     if dist == 'weibull':
         T = (nlU / scale) ** (1/shape)
     if dist == 'gompertz':
-        T = 1/shape * np.log(1 + shape*scale/nlU)
+        T = 1/shape * np.log(1 + shape/scale*nlU)
     return T
 
 
@@ -100,7 +100,7 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
     if dist == 'weibull':
         T = (nlp / scale) ** (1/shape)
     if dist == 'gompertz':
-        T = 1/shape * np.log(1 - (shape*nlp)/(scale))
+        T = 1/shape * np.log(1 + shape/scale*nlp)
     return T
 
 
@@ -134,6 +134,9 @@ class surv_dist():
         self.scale = t_wide(self.scale)
         self.shape = t_wide(self.shape)
         self.k = self.scale.shape[1]
+        # If distribution is expontial force the shape to be unity
+        if self.dist == 'exponential':
+            self.shape = self.shape*0 + 1
 
     def check_t(self, t):
         assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'
