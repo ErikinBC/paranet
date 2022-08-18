@@ -13,16 +13,7 @@ Classes to support parametric survival probability distributions
 import numpy as np
 
 # Internal modules
-from utils import param2array, len_of_none, t_long, t_wide
-
-# List of currently supported distributions
-dist_valid = ['exponential', 'weibull', 'gompertz']
-
-
-def check_dist_str(dist:str) -> None:
-    """CHECK THAT STRING BELONGS TO VALID DISTRIBUTION"""
-    assert isinstance(dist, str)
-    assert dist in dist_valid, f'dist must be one of: {", ".join(dist_valid)}'
+from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str
 
 
 def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -94,7 +85,7 @@ def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, 
     if dist == 'weibull':
         T = (nlU / scale) ** (1/shape)
     if dist == 'gompertz':
-        T = 1/shape * np.log(1 - (shape*nlU)/(scale))
+        T = 1/shape * np.log(1 + shape/scale*nlU)
     return T
 
 
@@ -109,11 +100,11 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
     if dist == 'weibull':
         T = (nlp / scale) ** (1/shape)
     if dist == 'gompertz':
-        T = 1/shape * np.log(1 - (shape*nlp)/(scale))
+        T = 1/shape * np.log(1 + shape/scale*nlp)
     return T
 
 
-class base_dist():
+class surv_dist():
     def __init__(self, dist:str, scale:float or np.ndarray or None=None, shape:float or np.ndarray or None=None) -> None:
         """
         Backbone class for parametric survival distributions. Choice of distribution will determine the call of other functions.
@@ -143,6 +134,9 @@ class base_dist():
         self.scale = t_wide(self.scale)
         self.shape = t_wide(self.shape)
         self.k = self.scale.shape[1]
+        # If distribution is expontial force the shape to be unity
+        if self.dist == 'exponential':
+            self.shape = self.shape*0 + 1
 
     def check_t(self, t):
         assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'
