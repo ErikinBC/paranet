@@ -11,9 +11,10 @@ Classes to support parametric survival probability distributions
 
 # External modules
 import numpy as np
+from scipy.optimize import root, minimize_scalar, minimize
 
 # Internal modules
-from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str
+from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str, check_interval, fast_auroc
 
 
 def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -62,7 +63,7 @@ def pdf(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> n
     return f
 
 
-def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int) -> np.ndarray:
+def rvs_T(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int=None) -> np.ndarray:
     """
     GENERATES n_sim RANDOM SAMPLES FROM A GIVEN DISTRIBUTION
 
@@ -70,23 +71,23 @@ def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, 
     ------
     n_sim:              Integer indicating the number of samples to generate
     k:                  The dimensionality of the scale/shape parameter
-    seed:               Reproducibility seed
+    seed:               Reproducibility seed (default=None)
     See hazard() for remaining parameters
 
     Returns
     -------
-    (n_sim x k) np.ndarray
+    (n_sim x k) np.ndarray of time-to-event measurements
     """
     if seed is not None:
         np.random.seed(seed)
     nlU = -np.log(np.random.rand(n_sim, k))
     if dist == 'exponential':
-        T = nlU / scale
+        T_act = nlU / scale
     if dist == 'weibull':
-        T = (nlU / scale) ** (1/shape)
+        T_act = (nlU / scale) ** (1/shape)
     if dist == 'gompertz':
-        T = 1/shape * np.log(1 + shape/scale*nlU)
-    return T
+        T_act = 1/shape * np.log(1 + shape/scale*nlU)
+    return T_act
 
 
 def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -102,6 +103,66 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
     if dist == 'gompertz':
         T = 1/shape * np.log(1 + shape/scale*nlp)
     return T
+
+
+
+def rvs(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, censoring:float=0, seed:None or int=None, n_censor_sim:int=100) -> tuple[np.ndarray,np.ndarray]:
+    """
+    GENERATES n_sim RANDOM SAMPLES FROM A GIVEN DISTRIBUTION
+
+    Inputs
+    ------
+    See rvs_T
+    censoring:          Fraction (in expectation) of observations that should be censored
+    n_censor_sim:       How many quantile points to use to determine lambda which achieves the censoring target
+
+    Returns
+    -------
+    2*(n_sim x k) np.ndarray's of observed time-to-event measurements and censoring indicator
+    """
+    check_interval(censoring, 0, 1)
+    # (i) Calculate the "actual" time-to-event
+    T_act = rvs_T(n_sim=n_sim, k=k, scale=scale, shape=shape, dist=dist, seed=seed)
+    if censoring == 0:  # Return actual if there is not censoring
+        D_cens = np.zeros(T_act.shape) + 1
+        return T_act, D_cens
+    # (ii) Determine the "scale" from an exponential needed   
+    # Generate n_censor_sim observations from the actual distribution
+    T_dist = rvs_T(n_sim=n_censor_sim, k=k, scale=scale, shape=shape, dist=dist, seed=seed)
+    scale_D = np.zeros(scale.shape)  # Create a holder
+    for j in range(scale.shape[1]):
+        breakpoint()
+        opt = minimize_scalar(compare_lam_auroc, args=(censoring, T_dist[:,j], n_censor_sim, seed), bracket=(1,2),method='brent')
+        assert opt.success, 'Brent optimization failed'
+        scale_D[:,j] = opt.x
+    # Generate data from exponential distribution
+    T_cens = -np.log(np.random.rand(n_sim, k)) / scale_D
+    D_cens = np.where(T_cens <= T_act, 0, 1)
+    T = np.where(D_cens == 1, T, T_cens)
+    return T, D_cens
+
+
+def compare_lam_auroc(scale:float, censoring:float, T_dist_target:np.ndarray, n_censor_sim:int, seed:int or None=None) -> float:
+    """
+    For a given scale parameter, compare the probability that a given exponential distribution is larger than a comparison
+
+    Inputs
+    ------
+    scale:              Scale parameter to test for exponential
+    censoring:          The targeted censoring rate
+    T_dist_target:      Sample from the distribution we want to censor
+    n_censor_sim:       Number of samples to draw from for exponential censoring distribution
+
+
+    Returns
+    -------
+    The MSE between the empirical AUROC and 1-target AUROC
+    """
+    T_dist_cens = rvs_T(n_sim=n_censor_sim, k=1, scale=scale, shape=None, dist='exponential', seed=seed)
+    auroc = fast_auroc(T_dist_cens, T_dist_target)
+    err = auroc - (1-censoring)
+    err2 = err**2
+    return err2
 
 
 class surv_dist():
@@ -150,9 +211,9 @@ class surv_dist():
     def pdf(self, t):
         return pdf(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 
-    def rvs(self, n_sim:int, seed:None or int=None):
+    def rvs(self, n_sim:int, censoring:float=0, seed:None or int=None, n_censor_sim:int=100):
         """INVERTED-CDF APPROACH"""
-        return rvs(n_sim=n_sim, k=self.k, scale=self.scale, shape=self.shape, dist=self.dist, seed=seed)
+        return rvs(n_sim=n_sim, k=self.k, scale=self.scale, shape=self.shape, censoring=censoring, dist=self.dist, seed=seed)
 
     def quantile(self, p:float or np.ndarray):
         return quantile(p, self.scale, self.shape, self.dist)

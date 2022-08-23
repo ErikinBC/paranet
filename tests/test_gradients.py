@@ -50,20 +50,18 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
     tol:                Tolerance for largest absolute value between gradients
     epsilon:            How much to add to the parameter vector to evaluate gradients
     """
-    # Censoring
-    D_dist = np.zeros([n_sim, len(lam)],dtype=int) + 1
     # Generate data
-    di_T_dist = dict.fromkeys(dist_valid)
+    di_TD_dist = dict.fromkeys(dist_valid)
     for dist in dist_valid:
         gen_dist = surv_dist(dist, scale=lam, shape=alph)
-        di_T_dist[dist] = gen_dist.rvs(n_sim, seed)
+        di_TD_dist[dist] = gen_dist.rvs(n_sim, seed)
 
     # Perturb parameter vectors for finite differences
     lam_high, lam_low = lam + epsilon, lam - epsilon
     alph_high, alph_low = alph + epsilon, alph - epsilon
     # Loop over distributions
     for dist in dist_valid:
-        T_dist = di_T_dist[dist]
+        T_dist, D_dist = di_TD_dist[dist]
         # (i) Gradient for lambda (0th position is for alpha)
         grad_lam_eps = (log_lik(T_dist, D_dist, lam_high, alph, dist) - log_lik(T_dist, D_dist, lam_low, alph, dist)) / (2*epsilon)
         grad_lam_fun = grad_ll(T_dist, D_dist, lam_high, alph, dist)[1]
