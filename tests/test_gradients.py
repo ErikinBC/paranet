@@ -81,3 +81,17 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
         print(f'Functional gradient aligns with finite differences for: {dist}')
         
 
+if __name__ == "__main__":
+    # (i) Check that MLL solver works
+    n = 100000
+    tol_param = 1e-3
+    test_solver(n, tol=tol_param)
+
+    # (ii) Check that gradients align with finite differences
+    n_sim = 100
+    seed = 1
+    tol = 1e-4
+    epsilon = 1e-10
+    test_finite_differences(n_sim, seed, tol, epsilon)
+
+    print('~~~ test_gradients completed without errors ~~~')    

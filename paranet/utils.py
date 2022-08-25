@@ -6,10 +6,35 @@ UTILITY FUNCTIONS
 import os
 import numpy as np
 import pandas as pd
+from typing import Callable
 from scipy.stats import rankdata
 
 # List of currently supported distributions
 dist_valid = ['exponential', 'weibull', 'gompertz']
+
+
+def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -> np.ndarray:
+    """
+    Calculates the derivative for a function over a single parameter (first argument)
+
+    Inputs
+    ------
+    f:              Some smooth function
+    x:              Input to calculate derivative over: f'(x)
+    eps:            Size of perturbation to calculate finite differences: (f(x+eps)-f(x-eps))/(2eps)
+    **args:         All other arguments to pass into f(x, **args)
+
+    Returns
+    -------
+    Will return a gradient the same size as the input array x
+    """
+    if not isinstance(x, np.ndarray):
+        x = np.array(x)
+    x_hi, x_lo = x + eps, x - eps
+    f_hi, f_lo = f(x_hi, **args), f(x_lo, **args)
+    grad = (f_hi - f_lo) / (2*eps)
+    return grad
+
 
 
 def fast_auroc(x:np.ndarray, y:np.ndarray) -> float:

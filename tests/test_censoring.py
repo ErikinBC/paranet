@@ -14,7 +14,7 @@ scale = [0.5, 1, 2]
 shape = scale[::-1]
 cens_seq = [0.25,0.5,0.75]
 
-def test_cens_precision(tol_cens:float=5e-3, n_points:int=100000, n_sim:int=10000000, method:str='trapezoidal',seed:int=1):
+def cens_precision(tol_cens:float=5e-3, n_points:int=100000, n_sim:int=10000000, method:str='trapezoidal',seed:int=1):
     for dist in dist_valid:
         mdl_dist = surv_dist(dist, scale, shape)
         for cens in cens_seq:
@@ -31,7 +31,9 @@ if __name__ == "__main__":
     n_sim = 10000000
     method = 'trapezoidal'
     seed = 1
-    test_cens_precision(tol_cens, n_points, n_sim, method, seed)
+    cens_precision(tol_cens, n_points, n_sim, method, seed)
+
+    print('~~~ test_censoring completed without errors ~~~')    
 
 
 # # Make an example plot of censored vs non-censored

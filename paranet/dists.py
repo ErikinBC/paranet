@@ -11,7 +11,7 @@ Classes to support parametric survival probability distributions
 
 # External modules
 import numpy as np
-from scipy.optimize import minimize_scalar, root_scalar
+from scipy.optimize import minimize_scalar
 
 # Internal modules
 from paranet.num_methods import get_intergral
@@ -191,6 +191,8 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     """
     # Input checks
     check_interval(censoring, 0, 1)
+    if (not hasattr(scale, 'shape')) or (len(scale.shape) <= 1):
+        scale, shape = t_wide(scale), t_wide(shape)
     assert scale.shape == shape.shape, 'scale and shape need to be the same'
     k = scale.shape[1]  # Assign the dimensionality
     # (i) Calculate the "actual" time-to-event
