@@ -19,7 +19,7 @@ lam = np.array([0.5, 1, 1.5])
 alph = np.array([0.5, 1, 1.5])
 k = len(lam)
 
-def test_solver(n_sim:int=100000, tol:float=1e-3) -> None:
+def test_solver(n_sim:int=1000000, tol:float=1e-2, seed:int=1) -> None:
     """
     Test that a large enough sample size convergences to close to the oracle parameters
 
@@ -28,15 +28,16 @@ def test_solver(n_sim:int=100000, tol:float=1e-3) -> None:
     nsim:               Number of points to sample from quantile range
     tol:                Tolerance for largest absolute value between MLE to oracle coefficients
     """
+    censoring_seq = [0, 1/4, 1/2]
     for dist in dist_valid:
         gen_dist = surv_dist(dist, scale=lam, shape=alph)
-        T_sim = gen_dist.quantile(p=np.linspace(1/n_sim,1-1/n_sim, n_sim))
-        D_sim = np.zeros([n_sim, k],dtype=int) + 1
-        hat_coef = wrapper_grad_solver(T_sim, D_sim, dist)
-        alph_lam = np.vstack([gen_dist.shape, gen_dist.scale])
-        print(f'-- Dist {dist} --')
-        print(alph_lam.round(5))
-        assert np.abs(hat_coef - alph_lam).max() < tol, f'MLE did not converge to tolerance {tol} for {dist}'
+        for censoring in censoring_seq:
+            print(f'Fitting {dist} model with {censoring:.2f} censoring')
+            T_sim, D_sim = gen_dist.rvs(n_sim, censoring, seed=seed)
+            hat_coef = wrapper_grad_solver(T_sim, D_sim, dist)
+            alph_lam = np.vstack([gen_dist.shape, gen_dist.scale])
+            err = np.abs(hat_coef - alph_lam).max()
+            assert err < tol, f'MLE did not converge to tolerance {tol} for {dist} with censoring {censoring}: {err}'
 
 
 def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:float=1e-10) -> None:
@@ -83,9 +84,9 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
 
 if __name__ == "__main__":
     # (i) Check that MLL solver works
-    n = 100000
-    tol_param = 1e-3
-    test_solver(n, tol=tol_param)
+    n = 1000000
+    tol_param = 0.01
+    test_solver(n, tol=tol_param, seed=1)
 
     # (ii) Check that gradients align with finite differences
     n_sim = 100
