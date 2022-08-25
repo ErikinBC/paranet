@@ -11,10 +11,10 @@ Classes to support parametric survival probability distributions
 
 # External modules
 import numpy as np
+from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
 
 # Internal modules
-from paranet.num_methods import get_intergral
 from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str, check_interval
 
 
@@ -80,7 +80,16 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
         T_q = 1/shape * np.log(1 + shape/scale*nlp)
     return T_q
 
-def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, xseq:np.ndarray, method:str='trapezoidal') -> np.ndarray:
+
+def integral_for_censoring(t:np.ndarray, scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str) -> np.ndarray:
+    f_dist = pdf(t, scale_T, shape_T, dist_T)
+    # Note the shape input doesn't matter here
+    S_dist = survival(t, scale_C, scale_C, 'exponential')
+    f_int = f_dist * S_dist
+    return f_int
+
+
+def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, alpha:float=0.001) -> np.ndarray:
     """
     Function to calculate the probability that P(C < T), where T is the target distribution of interest (defined by scale/shape), and C is an exponential distribution that will act as the censoring distribution where T_obs = T if T<C, and C if T>C
     
@@ -90,25 +99,29 @@ def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.nda
     scale_T:                    Scale of the target distribution
     shape_T:                    Shape parameter of the target distribution
     dist_T:                     Distribution of T        
-    xseq:                       Range of f(x) to evaluate over
+    alpha:                      Use 2*F^{-1}(1-alpha) for the upper bound of the integral
     
     Returns
     -------
     A 1xk vector of vector of censoring probabilities P(C < T)
     """
-    # Calculate function
-    f1 = pdf(xseq, scale_T, shape_T, dist_T)
-    if xseq.shape != f1.shape:
-        xseq = xseq.reshape(f1.shape)
-    f2 = np.exp(-scale_C*xseq)
-    ff =  f1 * f2
-    censoring = 1 - get_intergral(ff, xseq, method=method)
+    # Input chekcs
+    scale_C, scale_T, shape_T = t_wide(scale_C), t_wide(scale_T), t_wide(shape_T)
+    assert scale_C.shape == scale_T.shape == shape_T.shape, 'scale and shape need to have same dims'
+    # (i) Calculate a reasonable upper-bound to integrate over
+    b_upper = 2 * quantile(1-alpha, scale_T, shape_T, dist_T)
+    assert b_upper.shape == scale_C.shape, 'Integral upper bound needs to have same dims'
+    # (ii) Loop over the columns
+    censoring = np.zeros(scale_C.shape)
+    for k in range(scale_C.shape[1]):
+        integral_k, _ = quad(func=integral_for_censoring, a=0, b=b_upper, args=(scale_C, scale_T, shape_T, dist_T))
+        censoring[:,k] = 1 - integral_k
     return censoring
 
 
-def err2_censoring_exponential(scale_C:np.ndarray, censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, xseq:np.ndarray, method:str='trapezoidal', ret_squared:bool=True):
+def err2_censoring_exponential(scale_C:np.ndarray, censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, ret_squared:bool=True):
     """Calculates squared error between target censoring and expected value"""
-    expected_censoring = censoring_exponential(scale_C, scale_T, shape_T, dist_T, xseq, method)
+    expected_censoring = censoring_exponential(scale_C, scale_T, shape_T, dist_T)
     if ret_squared:
         err = np.sum((censoring - expected_censoring)**2)
     else:
@@ -116,17 +129,14 @@ def err2_censoring_exponential(scale_C:np.ndarray, censoring:float, scale_T:np.n
     return err
 
 
-def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, n_points:int=100, method:str='trapezoidal') -> np.ndarray:
+def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str) -> np.ndarray:
     """
     Finds the scale parameter for an exponential distribution to achieve the target censoring for a given target distribution
 
     Inputs
     ------
     censoring:                  Probability that censoring RV will be less that actual
-    n_steps:                    Number of point to use for numerical integration
-    method:                     Integration method
-    n_points:                   Number of points to use to determine integral
-
+    
     Returns
     -------
     1xk vector of scale parameters for censoring exponential distribution
@@ -135,14 +145,9 @@ def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.nda
     check_interval(censoring, 0, 1)
     check_dist_str(dist_T)
     # (ii) Use the quantiles from each distribution
-    pseq = np.arange(1/n_points, 1, 1/n_points)
-    xseq = quantile(pseq, scale_T, shape_T, dist_T)
     scale_C = np.zeros(scale_T.shape)
     for i in range(scale_C.shape[1]):
-        # opt = root_scalar(err2_censoring_exponential, args=(censoring, scale_T[:,i], shape_T[:,i], dist_T, xseq, method, False), method='brentq', bracket=(0.1,5),x0=0.1,x1=5)
-        # assert opt.flag == 'converged', 'Brent minimization was not successful'
-        # scale_C[:,i] = opt.root
-        opt = minimize_scalar(fun=err2_censoring_exponential, bracket=(1,2),args=(censoring, scale_T[:,i], shape_T[:,i], dist_T, xseq, method),method='brent')
+        opt = minimize_scalar(fun=err2_censoring_exponential, bracket=(1,2),args=(censoring, scale_T[:,i], shape_T[:,i], dist_T),method='brent')
         assert opt.success, 'Brent minimization was not successful'
         scale_C[:,i] = opt.x
     return scale_C
@@ -174,7 +179,7 @@ def rvs_T(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str
     return T_act
 
 
-def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int=None, censoring:float=0, n_points:int=1000, method:str='trapezoidal') -> tuple[np.ndarray,np.ndarray]:
+def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int=None, censoring:float=0) -> tuple[np.ndarray,np.ndarray]:
     """
     GENERATES n_sim RANDOM SAMPLES FROM A GIVEN DISTRIBUTION
 
@@ -191,8 +196,7 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     """
     # Input checks
     check_interval(censoring, 0, 1)
-    if (not hasattr(scale, 'shape')) or (len(scale.shape) <= 1):
-        scale, shape = t_wide(scale), t_wide(shape)
+    scale, shape = t_wide(scale), t_wide(shape)
     assert scale.shape == shape.shape, 'scale and shape need to be the same'
     k = scale.shape[1]  # Assign the dimensionality
     # (i) Calculate the "actual" time-to-event
@@ -201,7 +205,7 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
         D_cens = np.zeros(T_act.shape) + 1
         return T_act, D_cens
     # (ii) Determine the "scale" from an exponential needed to obtain censoring
-    scale_C = find_exp_scale_censoring(censoring=censoring, scale_T=scale, shape_T=shape, dist_T=dist, n_points=n_points, method=method)
+    scale_C = find_exp_scale_censoring(censoring=censoring, scale_T=scale, shape_T=shape, dist_T=dist)
 
     # Generate data from exponential distribution
     T_cens = -np.log(np.random.rand(n_sim, k)) / scale_C
@@ -256,9 +260,9 @@ class surv_dist():
     def pdf(self, t):
         return pdf(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 
-    def rvs(self, n_sim:int, censoring:float=0, seed:None or int=None, n_points:int=1000, method:str='trapezoidal'):
+    def rvs(self, n_sim:int, censoring:float=0, seed:None or int=None):
         """INVERTED-CDF APPROACH"""
-        return rvs(n_sim=n_sim, censoring=censoring, scale=self.scale, shape=self.shape, dist=self.dist, seed=seed, n_points=n_points, method=method)
+        return rvs(n_sim=n_sim, censoring=censoring, scale=self.scale, shape=self.shape, dist=self.dist, seed=seed)
  
     def quantile(self, p:float or np.ndarray):
         return quantile(p, self.scale, self.shape, self.dist)

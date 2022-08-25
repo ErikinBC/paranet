@@ -54,7 +54,7 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
     di_TD_dist = dict.fromkeys(dist_valid)
     for dist in dist_valid:
         gen_dist = surv_dist(dist, scale=lam, shape=alph)
-        di_TD_dist[dist] = gen_dist.rvs(n_sim, seed)
+        di_TD_dist[dist] = gen_dist.rvs(n_sim=n_sim, seed=seed)
 
     # Perturb parameter vectors for finite differences
     lam_high, lam_low = lam + epsilon, lam - epsilon
