@@ -19,7 +19,7 @@ lam = np.array([0.5, 1, 1.5])
 alph = np.array([0.5, 1, 1.5])
 k = len(lam)
 
-def test_solver(n_sim:int=100000, tol:float=1e-3) -> None:
+def test_solver(n_sim:int=1000000, tol:float=1e-2, seed:int=1) -> None:
     """
     Test that a large enough sample size convergences to close to the oracle parameters
 
@@ -28,15 +28,16 @@ def test_solver(n_sim:int=100000, tol:float=1e-3) -> None:
     nsim:               Number of points to sample from quantile range
     tol:                Tolerance for largest absolute value between MLE to oracle coefficients
     """
+    censoring_seq = [0, 1/4, 1/2]
     for dist in dist_valid:
         gen_dist = surv_dist(dist, scale=lam, shape=alph)
-        T_sim = gen_dist.quantile(p=np.linspace(1/n_sim,1-1/n_sim, n_sim))
-        D_sim = np.zeros([n_sim, k],dtype=int) + 1
-        hat_coef = wrapper_grad_solver(T_sim, D_sim, dist)
-        alph_lam = np.vstack([gen_dist.shape, gen_dist.scale])
-        print(f'-- Dist {dist} --')
-        print(alph_lam.round(5))
-        assert np.abs(hat_coef - alph_lam).max() < tol, f'MLE did not converge to tolerance {tol} for {dist}'
+        for censoring in censoring_seq:
+            print(f'Fitting {dist} model with {censoring:.2f} censoring')
+            T_sim, D_sim = gen_dist.rvs(n_sim, censoring, seed=seed)
+            hat_coef = wrapper_grad_solver(T_sim, D_sim, dist)
+            alph_lam = np.vstack([gen_dist.shape, gen_dist.scale])
+            err = np.abs(hat_coef - alph_lam).max()
+            assert err < tol, f'MLE did not converge to tolerance {tol} for {dist} with censoring {censoring}: {err}'
 
 
 def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:float=1e-10) -> None:
@@ -50,20 +51,18 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
     tol:                Tolerance for largest absolute value between gradients
     epsilon:            How much to add to the parameter vector to evaluate gradients
     """
-    # Censoring
-    D_dist = np.zeros([n_sim, len(lam)],dtype=int) + 1
     # Generate data
-    di_T_dist = dict.fromkeys(dist_valid)
+    di_TD_dist = dict.fromkeys(dist_valid)
     for dist in dist_valid:
         gen_dist = surv_dist(dist, scale=lam, shape=alph)
-        di_T_dist[dist] = gen_dist.rvs(n_sim, seed)
+        di_TD_dist[dist] = gen_dist.rvs(n_sim=n_sim, seed=seed)
 
     # Perturb parameter vectors for finite differences
     lam_high, lam_low = lam + epsilon, lam - epsilon
     alph_high, alph_low = alph + epsilon, alph - epsilon
     # Loop over distributions
     for dist in dist_valid:
-        T_dist = di_T_dist[dist]
+        T_dist, D_dist = di_TD_dist[dist]
         # (i) Gradient for lambda (0th position is for alpha)
         grad_lam_eps = (log_lik(T_dist, D_dist, lam_high, alph, dist) - log_lik(T_dist, D_dist, lam_low, alph, dist)) / (2*epsilon)
         grad_lam_fun = grad_ll(T_dist, D_dist, lam_high, alph, dist)[1]
@@ -83,3 +82,17 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
         print(f'Functional gradient aligns with finite differences for: {dist}')
         
 
+if __name__ == "__main__":
+    # (i) Check that MLL solver works
+    n = 1000000
+    tol_param = 0.01
+    test_solver(n, tol=tol_param, seed=1)
+
+    # (ii) Check that gradients align with finite differences
+    n_sim = 100
+    seed = 1
+    tol = 1e-4
+    epsilon = 1e-10
+    test_finite_differences(n_sim, seed, tol, epsilon)
+
+    print('~~~ test_gradients completed without errors ~~~')    

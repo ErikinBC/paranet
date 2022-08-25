@@ -3,11 +3,75 @@ UTILITY FUNCTIONS
 """
 
 # External modules
+import os
 import numpy as np
 import pandas as pd
+from typing import Callable
+from scipy.stats import rankdata
 
 # List of currently supported distributions
 dist_valid = ['exponential', 'weibull', 'gompertz']
+
+
+def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -> np.ndarray:
+    """
+    Calculates the derivative for a function over a single parameter (first argument)
+
+    Inputs
+    ------
+    f:              Some smooth function
+    x:              Input to calculate derivative over: f'(x)
+    eps:            Size of perturbation to calculate finite differences: (f(x+eps)-f(x-eps))/(2eps)
+    **args:         All other arguments to pass into f(x, **args)
+
+    Returns
+    -------
+    Will return a gradient the same size as the input array x
+    """
+    if not isinstance(x, np.ndarray):
+        x = np.array(x)
+    x_hi, x_lo = x + eps, x - eps
+    f_hi, f_lo = f(x_hi, **args), f(x_lo, **args)
+    grad = (f_hi - f_lo) / (2*eps)
+    return grad
+
+
+
+def fast_auroc(x:np.ndarray, y:np.ndarray) -> float:
+    n_x, n_y = len(x), len(y)
+    x, y = flatten(x), flatten(y)
+    df = pd.DataFrame({'grp':np.repeat([1,0],[n_x, n_y]), 's':np.concatenate((x,y))})
+    df['r'] = rankdata(df['s'])
+    auroc = (df.query('grp==1')['r'].sum() - n_x*(n_x+1)/2) / (n_x*n_y)
+    return auroc
+
+
+def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
+    """
+    Wrapper to save a ggplot or patchworklib object object
+    Inputs
+    ------
+    fn:         Filename to save (should end with .{png,jpg,etc})
+    fold:       Folder to write the image to
+    gg:         The plotnine ggplot object
+    width:      Width of image (inches)
+    height:     Height of image (inches)
+    """
+    gg_type = str(type(gg))  # Get the type
+    path = os.path.join(fold, fn)  # Pre-set the path
+    if os.path.exists(path):
+        os.remove(path)  # Remove figure if it already exists
+    if gg_type == "<class 'plotnine.ggplot.ggplot'>":
+        gg.save(path, width=width, height=height, limitsize=False)
+    elif gg_type == "<class 'patchworklib.patchworklib.Bricks'>":
+        gg.savefig(fname=path)
+    else:
+        print('gg is not a recordnized type')
+
+
+def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float) -> None:
+    """Check: low <= x <= high"""
+    assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
 
 
 def check_dist_str(dist:str) -> None:
@@ -99,6 +163,11 @@ def t_long(x:np.ndarray or float or pd.Series or None) -> np.ndarray:
     if n_shape == 1:
         x = x.reshape([max(x.shape), 1])
     return x
+
+
+def flatten(x:np.ndarray or float or pd.Series) -> np.ndarray:
+    """ Returns a flat array"""
+    return np.array(x).flatten()
 
 
 def len_of_none(x:np.ndarray or None) -> int:
