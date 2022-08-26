@@ -15,9 +15,9 @@ from scipy.optimize import minimize
 
 # Internal modules
 from paranet.gradient import grad_ll, log_lik
-from paranet.utils import is_vector, shape_scale_2vec, get_p_k
+from paranet.utils import is_vector, shape_scale_2vec, get_p_k, broadcast_dist
 
-def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) -> float:
+def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or list) -> float:
     """
     MAPS A [p*k,1] PARAMETER VECTOR/MATRIX TO A SINGLE LOG-LIKELIHOOD
 
@@ -70,12 +70,13 @@ def grad_ll_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) ->
     return grad_vec
 
 
-def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str, x0:None or np.ndarray=None):
+def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or np.ndarray=None):
     """
     CARRIES OUT OPTIMIZATION FOR GRADIENT-BASED METHOD
     """
     # Input checks
     p, k = get_p_k(t)
+    dist = broadcast_dist(dist, k)
     # Initialize parameters
     if x0 is None:
         x0 = np.zeros([p,k]) + 1

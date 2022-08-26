@@ -15,10 +15,10 @@ from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
 
 # Internal modules
-from paranet.utils import param2array, len_of_none, t_long, t_wide, check_dist_str, check_interval
+from paranet.utils import broadcast_long, param2array, len_of_none, str2lst, t_long, t_wide, check_dist_str, check_interval, dist2vec, dist2idx, broadcast_dist
 
 
-def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
+def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:list or str) -> np.ndarray:
     """
     CALCULATES THE HAZARD FUNCTION FOR THE RELEVANT CLASSES
 
@@ -29,30 +29,46 @@ def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -
     shape:              alpha
     dist:               One of dist_valid
     """
-    check_dist_str(dist)
+    # Input cheks
+    scale, shape = t_wide(scale), t_wide(shape)
+    k = scale.shape[1]
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
     t_vec = t_long(t)
-    if dist == 'exponential':
-        h = scale * (t_vec*0 + 1)
-    if dist == 'weibull':
-        h = shape * scale * t_vec**(shape-1)
-    if dist == 'gompertz':
-        h = scale * np.exp(shape*t_vec)
-    return h
+    n = t_vec.shape[0]
+    h_mat = np.zeros([n, k])
+    # Calculate hazard
+    for d, i in didx.items():
+        if d == 'exponential':
+            h_mat[:,i] = scale[:,i] * (t_vec*0 + 1)
+        if d == 'weibull':
+            h_mat[:,i] = shape[:,i] * scale[:,i] * t_vec**(shape[:,i]-1)
+        if d == 'gompertz':
+            h_mat[:,i] = scale[:,i] * np.exp(shape[:,i]*t_vec)
+    return h_mat
 
 
 def survival(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
     """
     CALCULATES THE SURVIVAL FUNCTION FOR THE RELEVANT CLASSES (SEE HAZARD)
     """
-    check_dist_str(dist)
+    # Input cheks
+    scale, shape = t_wide(scale), t_wide(shape)
+    k = scale.shape[1]
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
     t_vec = t_long(t)
-    if dist == 'exponential':
-        s = np.exp(-scale * t_vec)
-    if dist == 'weibull':
-        s = np.exp(-scale * t_vec**shape)
-    if dist == 'gompertz':
-        s = np.exp(-scale/shape * (np.exp(shape*t_vec)-1))
-    return s
+    n = t_vec.shape[0]
+    s_mat = np.zeros([n, k])
+    # Calculate survival
+    for d, i in didx.items():
+        if d == 'exponential':
+            s_mat[:,i] = np.exp(-scale[:,i] * t_vec)
+        if d == 'weibull':
+            s_mat[:,i] = np.exp(-scale[:,i] * t_vec**shape[:,i])
+        if d == 'gompertz':
+            s_mat[:,i] = np.exp(-scale[:,i]/shape[:,i] * (np.exp(shape[:,i]*t_vec)-1))
+    return s_mat
 
 
 def pdf(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -70,15 +86,23 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
     """
     CALCULATES THE QUANTILE FUNCTION FOR THE RELEVANT CLASSES (SEE HAZARD)
     """
-    check_dist_str(dist)
-    nlp = -np.log(1 - t_long(p))
-    if dist == 'exponential':
-        T_q = nlp / scale
-    if dist == 'weibull':
-        T_q = (nlp / scale) ** (1/shape)
-    if dist == 'gompertz':
-        T_q = 1/shape * np.log(1 + shape/scale*nlp)
-    return T_q
+    # Input checks
+    scale, shape = t_wide(scale), t_wide(shape)
+    k = scale.shape[1]
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
+    nlp = -np.log(1 - broadcast_long(p, k))
+    n = nlp.shape[0]    
+    q_mat = np.zeros([n, k])
+    # Calculate quantile
+    for d, i in didx.items():
+        if d == 'exponential':
+            q_mat[:,i] = nlp[:,i] / scale[:,i]
+        if d == 'weibull':
+            q_mat[:,i] = (nlp[:,i] / scale[:,i]) ** (1/shape[:,i])
+        if d == 'gompertz':
+            q_mat[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlp)
+    return q_mat
 
 
 def integral_for_censoring(t:np.ndarray, scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str) -> np.ndarray:
@@ -147,13 +171,13 @@ def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.nda
     # (ii) Use the quantiles from each distribution
     scale_C = np.zeros(scale_T.shape)
     for i in range(scale_C.shape[1]):
-        opt = minimize_scalar(fun=err2_censoring_exponential, bracket=(1,2),args=(censoring, scale_T[:,i], shape_T[:,i], dist_T),method='brent')
+        opt = minimize_scalar(fun=err2_censoring_exponential, bracket=(1,2),args=(censoring, scale_T[:,i], shape_T[:,i], dist_T[i]),method='brent')
         assert opt.success, 'Brent minimization was not successful'
         scale_C[:,i] = opt.x
     return scale_C
 
 
-def rvs_T(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int=None) -> np.ndarray:
+def rvs_T(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:None or int=None) -> np.ndarray:
     """
     GENERATES n_sim RANDOM SAMPLES FROM A GIVEN DISTRIBUTION
 
@@ -167,15 +191,24 @@ def rvs_T(n_sim:int, k:int, scale:np.ndarray, shape:np.ndarray or None, dist:str
     -------
     (n_sim x k) np.ndarray of time-to-event measurements
     """
+    # Input cheks
+    k = scale.shape[1]  # Assign the dimensionality
+    dist = dist2vec(dist, scale)
+    k = len(dist)
+    # Generate randomness
     if seed is not None:
         np.random.seed(seed)
     nlU = -np.log(np.random.rand(n_sim, k))
-    if dist == 'exponential':
-        T_act = nlU / scale
-    if dist == 'weibull':
-        T_act = (nlU / scale) ** (1/shape)
-    if dist == 'gompertz':
-        T_act = 1/shape * np.log(1 + shape/scale*nlU)
+    T_act = np.zeros([n_sim, k])
+    # Calculate quantile
+    didx = dist2idx(dist)
+    for d, i in didx.items():
+        if d == 'exponential':
+            T_act[:,i] = nlU[:,i] / scale[:,i]
+        if d == 'weibull':
+            T_act[:,i] = (nlU[:,i] / scale[:,i]) ** (1/shape[:,i])
+        if d == 'gompertz':
+            T_act[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlU[:,i])
     return T_act
 
 
@@ -197,10 +230,10 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     # Input checks
     check_interval(censoring, 0, 1)
     scale, shape = t_wide(scale), t_wide(shape)
+    k = scale.shape[1]
     assert scale.shape == shape.shape, 'scale and shape need to be the same'
-    k = scale.shape[1]  # Assign the dimensionality
     # (i) Calculate the "actual" time-to-event
-    T_act = rvs_T(n_sim=n_sim, k=k, scale=scale, shape=shape, dist=dist, seed=seed)
+    T_act = rvs_T(n_sim=n_sim, scale=scale, shape=shape, dist=dist, seed=seed)
     if censoring == 0:  # Return actual if there is not censoring
         D_cens = np.zeros(T_act.shape) + 1
         return T_act, D_cens
@@ -228,7 +261,7 @@ class surv_dist():
         # Do input checks
         check_dist_str(dist)
         # Assign to attributes
-        self.dist = dist
+        self.dist = str2lst(dist)
         self.scale = param2array(scale)
         self.shape = param2array(shape)
         n_scale = len_of_none(self.scale)
@@ -244,9 +277,14 @@ class surv_dist():
         self.scale = t_wide(self.scale)
         self.shape = t_wide(self.shape)
         self.k = self.scale.shape[1]
+        # Broadcast dist if k > 1 and len(dist)==1
+        self.dist = broadcast_dist(self.dist, self.k)
         # If distribution is expontial force the shape to be unity
-        if self.dist == 'exponential':
-            self.shape = self.shape*0 + 1
+        self.didx = dist2idx(self.dist)
+        if 'exponential' in self.didx:
+            idx_exp = self.didx['exponential']
+            self.shape[:,idx_exp] = self.shape[:,idx_exp]*0 + 1
+        
 
     def check_t(self, t):
         assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'

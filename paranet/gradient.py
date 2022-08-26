@@ -6,7 +6,7 @@ GRADIENT METHODS FOR MLL FITTING
 import numpy as np
 
 # Internal modules
-from paranet.utils import format_t_d_scale_shape
+from paranet.utils import broadcast_dist, format_t_d_scale_shape, dist2idx
 
 
 def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -25,14 +25,21 @@ def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or No
     ------
     ll:                 A (k,) array of log-likelihoods
     """
-    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape, dist)
-    if dist == 'exponential':
-        ll = -np.mean(d_vec * np.log(scale) - scale*t_vec, axis=0)
-    if dist == 'weibull':
-        ll = -np.mean(d_vec*(np.log(shape*scale) + (shape-1)*np.log(t_vec)) - scale*t_vec**shape, axis=0)
-    if dist == 'gompertz':
-        ll = -np.mean(d_vec*(np.log(scale)+shape*t_vec) - scale/shape*(np.exp(shape*t_vec)-1), axis=0)
-    return ll
+    # Note that this will broadcast t wide if k > 1
+    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape)
+    k = scale.shape[1]
+    ll_vec = np.zeros(k)
+    # Calculate negative mean of log-likelihood
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
+    for d, i in didx.items():
+        if d == 'exponential':
+            ll_vec[i] = -np.mean(d_vec[:,i] * np.log(scale[:,i]) - scale[:,i]*t_vec[:,i], axis=0)
+        if d == 'weibull':
+            ll_vec[i] = -np.mean(d_vec[:,i]*(np.log(shape[:,i]*scale[:,i]) + (shape[:,i]-1)*np.log(t_vec[:,i])) - scale[:,i]*t_vec[:,i]**shape[:,i], axis=0)
+        if d == 'gompertz':
+            ll_vec = -np.mean(d_vec[:,i]*(np.log(scale[:,i])+shape[:,i]*t_vec[:,i]) - scale[:,i]/shape[:,i]*(np.exp(shape[:,i]*t_vec[:,i])-1), axis=0)
+    return ll_vec
 
 
 def grad_ll(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -66,14 +73,20 @@ def grad_ll_scale(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray
     -------
     dll:               An (k,) array of gradients
     """
-    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape, dist)
-    if dist == 'exponential':
-        dll = -np.mean(d_vec/scale - t_vec, axis=0)
-    if dist == 'weibull':
-        dll = -np.mean(d_vec/scale - t_vec**shape, axis=0)
-    if dist == 'gompertz':
-        dll = -np.mean(d_vec/scale - (np.exp(shape*t_vec) - 1)/shape, axis=0)
-    return dll
+    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape)
+    k = scale.shape[1]
+    dll_vec = np.zeros(k)
+    # Calculate negative gradient of log-likelihood
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
+    for d, i in didx.items():
+        if d == 'exponential':
+            dll_vec[i] = -np.mean(d_vec[:,i]/scale[:,i] - t_vec[:,i], axis=0)
+        if d == 'weibull':
+            dll_vec[i] = -np.mean(d_vec[:,i]/scale[:,i] - t_vec[:,i]**shape[:,i], axis=0)
+        if d == 'gompertz':
+            dll_vec[i] = -np.mean(d_vec[:,i]/scale[:,i] - (np.exp(shape[:,i]*t_vec[:,i]) - 1)/shape[:,i], axis=0)
+    return dll_vec
 
 
 def grad_ll_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -86,16 +99,22 @@ def grad_ll_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray
 
     Returns
     -------
-    dll:               An (k,) or [p-1,k] array/matrix of gradients
+    dll:               An (k,) array of gradients
     """
-    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape, dist)
-    if dist == 'exponential':
-        dll = -np.repeat(0, scale.shape[1]).astype(float)
-    if dist == 'weibull':
-        dll = -np.mean( d_vec*(1/shape + np.log(t_vec)) - scale*t_vec**shape*np.log(t_vec), axis=0)
-    if dist == 'gompertz':
-        dll = -np.mean( d_vec*t_vec - (scale/shape**2)*(np.exp(shape*t_vec)*(shape*t_vec-1) +1), axis=0)
-    return dll
+    t_vec, d_vec, scale, shape = format_t_d_scale_shape(t, d, scale, shape)
+    k = scale.shape[1]
+    dll_vec = np.zeros(k)
+    # Calculate negative gradient of log-likelihood
+    dist = broadcast_dist(dist, k)
+    didx = dist2idx(dist)
+    for d, i in didx.items():
+        if d == 'exponential':
+            dll_vec[i] = -np.repeat(0, len(i))
+        if d == 'weibull':
+            dll_vec[i] = -np.mean( d_vec[:,i]*(1/shape[:,i] + np.log(t_vec[:,i])) - scale[:,i]*t_vec[:,i]**shape[:,i]*np.log(t_vec[:,i]), axis=0)
+        if d == 'gompertz':
+            dll_vec[i] = -np.mean( d_vec[:,i]*t_vec[:,i] - (scale[:,i]/shape[:,i]**2)*(np.exp(shape[:,i]*t_vec[:,i])*(shape[:,i]*t_vec[:,i]-1) +1), axis=0)
+    return dll_vec
 
 
 
