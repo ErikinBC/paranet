@@ -38,6 +38,7 @@ def test_solver(n_sim:int=1000000, tol:float=1e-2, seed:int=1) -> None:
             alph_lam = np.vstack([gen_dist.shape, gen_dist.scale])
             err = np.abs(hat_coef - alph_lam).max()
             assert err < tol, f'MLE did not converge to tolerance {tol} for {dist} with censoring {censoring}: {err}'
+    print('~ End of test_solver() ~')
 
 
 def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:float=1e-10) -> None:

@@ -74,10 +74,67 @@ def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:in
     assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
 
 
-def check_dist_str(dist:str) -> None:
+def str2lst(x):
+    """Will convert a string to a list of length one"""
+    if isinstance(x, str):
+        x = [x]
+    if isinstance(x, np.ndarray) or isinstance(x, pd.Series):
+        x = list(x)
+    return x
+
+
+def dist2idx(dist:list):
+    """
+    Returns a dictionary assigning the distributions to the different column indices
+    """
+    check_type(dist, list, 'dist')
+    didx = {}
+    for i, d in enumerate(dist):
+        if d in didx:
+            didx[d] = didx[d] + [i]
+        else:
+            didx[d] = [i]
+    return didx
+
+
+def broadcast_dist(dist:str or list, k:int):
+    """
+    If dist is a string or list of lenght one, will make into a list of length k if scale is an (1,k) array
+    """
+    dist = str2lst(dist)
+    n_dist = len(dist)
+    if k > n_dist:
+        dist = dist * k
+    return dist
+
+
+def broadcast_long(x:np.ndarray, k:int):
+    """If we have an (n,1) array, convert to an (n,k) with duplicate columns"""
+    if hasattr(x, 'shape'):
+        if len(x.shape) == 1:
+            return np.tile(t_long(x),[1,k])
+        else:
+            return np.tile(x,[1,k])
+    else:
+        return np.tile(t_long(x),[1,k])
+
+
+def check_dist_str(dist:str or list) -> None:
     """CHECK THAT STRING BELONGS TO VALID DISTRIBUTION"""
-    assert isinstance(dist, str)
-    assert dist in dist_valid, f'dist must be one of: {", ".join(dist_valid)}'
+    dist = str2lst(dist)
+    assert all([d in dist_valid for d in dist]), f'dist must be one of: {", ".join(dist_valid)}'
+
+
+def dist2vec(dist:str or list, scale:np.ndarray):
+    """Ensure that a string or input array is a list of length k"""
+    dist = str2lst(dist)
+    check_dist_str(dist)
+    k = max(len(dist), t_wide(scale).shape[1])
+    if len(dist) == 1:
+        dist = dist * k
+    else:
+        assert len(dist) == k, 'length of dist needs to align with scale'
+    return dist
 
 
 def is_vector(x:np.ndarray) -> None:
@@ -118,22 +175,24 @@ def shape_scale_2vec(shape_scale:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return shape, scale
 
 
-def format_t_d(t:np.ndarray, d:np.ndarray, dist:str) -> tuple[np.ndarray, np.ndarray]:
+def format_t_d(t:np.ndarray, d:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
     """
-    check_dist_str(dist)
     t_vec, d_vec = t_long(t), t_long(d)
     assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be teh same size'
     return t_vec, d_vec
 
 
-def format_t_d_scale_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)  -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def format_t_d_scale_shape(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None)  -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
     """
-    t_vec, d_vec = format_t_d(t, d, dist)
+    t_vec, d_vec = format_t_d(t, d)
     scale, shape = t_wide(scale), t_wide(shape)
+    k = scale.shape[1]
+    t_vec = broadcast_long(t_vec, k)
+    d_vec = broadcast_long(d_vec, k)
     return t_vec, d_vec, scale, shape
 
 
