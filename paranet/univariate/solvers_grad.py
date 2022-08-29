@@ -14,7 +14,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 # Internal modules
-from paranet.gradient import grad_ll, log_lik
+from paranet.univariate.gradient import grad_ll, log_lik
 from paranet.utils import is_vector, shape_scale_2vec, get_p_k, broadcast_td_dist, t_long
 
 def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or list) -> float:

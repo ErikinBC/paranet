@@ -6,7 +6,7 @@ Ensure that rvs(...,censoring=float) works and achieves expected censoring level
 import numpy as np
 
 # Internal modules
-from paranet.dists import surv_dist
+from paranet.univariate.dists import surv_dist
 from paranet.utils import dist_valid
 
 # Experiment with different shape parameters

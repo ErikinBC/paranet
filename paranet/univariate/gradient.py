@@ -17,8 +17,8 @@ def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or No
     ------
     t:                  A [n,k] or (n,) matrix/array of time-to-event values
     d:                  A [n,k] or (n,) matrix/array of censoring values (1=event, 0=right-censored)
-    scale:              See (SurvDists): equivilent to \lambda
-    shape:              See (SurvDists): equivilent to \alpha
+    scale:              See (SurvDists): equivilent to lambda
+    shape:              See (SurvDists): equivilent to alpha
     dist:               A valid distribution (currently: exponential, weibull, or gompertz)
 
     Returns

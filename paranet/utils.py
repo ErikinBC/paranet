@@ -3,12 +3,10 @@ UTILITY FUNCTIONS
 """
 
 # External modules
-from asyncio import SendfileNotAvailableError
 import os
 import numpy as np
 import pandas as pd
 from typing import Callable
-from scipy.stats import rankdata
 
 # List of currently supported distributions
 dist_valid = ['exponential', 'weibull', 'gompertz']
@@ -124,7 +122,10 @@ def broadcast_long(x:np.ndarray, k:int):
         if len(x.shape) == 1:
             return np.tile(t_long(x),[1,k])
         else:
-            return np.tile(x,[1,k])
+            if x.shape[1] == 1:
+                return np.tile(x,[1,k])
+            else:
+                return x
     else:
         return np.tile(t_long(x),[1,k])
 

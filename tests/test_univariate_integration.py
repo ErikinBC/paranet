@@ -7,7 +7,7 @@ import numpy as np
 from scipy.integrate import quad
 
 # Internal functions
-from paranet.dists import quantile, survival, pdf, rvs
+from paranet.univariate.dists import quantile, survival, pdf, rvs
 from paranet.utils import dist_valid, grad_finite_differences, t_wide
 
 # Set up parameters to test

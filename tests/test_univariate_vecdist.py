@@ -6,9 +6,9 @@ Check that the vectorization of distribution vector works as expected
 import numpy as np
 
 # Internal modules
-from paranet.dists import surv_dist
+from paranet.univariate.dists import surv_dist
 from paranet.utils import dist_valid
-from paranet.solvers_grad import wrapper_grad_solver
+from paranet.univariate.solvers_grad import wrapper_grad_solver
 
 
 def test_one2many(n_sim:int=10000):

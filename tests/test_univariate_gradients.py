@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 # Internal modules
-from paranet.dists import surv_dist
-from paranet.gradient import log_lik, grad_ll
+from paranet.univariate.dists import surv_dist
+from paranet.univariate.gradient import log_lik, grad_ll
 from paranet.utils import dist_valid, vstack_pd
-from paranet.solvers_grad import wrapper_grad_solver
+from paranet.univariate.solvers_grad import wrapper_grad_solver
 
 # Scale and shape parameters shared by functions
 lam = np.array([0.5, 1, 1.5])
