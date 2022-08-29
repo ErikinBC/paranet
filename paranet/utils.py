@@ -3,6 +3,7 @@ UTILITY FUNCTIONS
 """
 
 # External modules
+from asyncio import SendfileNotAvailableError
 import os
 import numpy as np
 import pandas as pd
@@ -34,16 +35,6 @@ def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -
     f_hi, f_lo = f(x_hi, **args), f(x_lo, **args)
     grad = (f_hi - f_lo) / (2*eps)
     return grad
-
-
-
-def fast_auroc(x:np.ndarray, y:np.ndarray) -> float:
-    n_x, n_y = len(x), len(y)
-    x, y = flatten(x), flatten(y)
-    df = pd.DataFrame({'grp':np.repeat([1,0],[n_x, n_y]), 's':np.concatenate((x,y))})
-    df['r'] = rankdata(df['s'])
-    auroc = (df.query('grp==1')['r'].sum() - n_x*(n_x+1)/2) / (n_x*n_y)
-    return auroc
 
 
 def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
@@ -106,6 +97,25 @@ def broadcast_dist(dist:str or list, k:int):
     if k > n_dist:
         dist = dist * k
     return dist
+
+
+def broadcast_td_dist(t:np.ndarray, d:np.ndarray, dist:str or list) -> tuple[np.ndarray, np.ndarray, list]:
+    """
+    Broadcast either the time/censor vectors or the dist. For example, if t ~ (n,1) and len(dist)=k, then t ~ (n,k)
+    """
+    # Input checks
+    assert hasattr(t, 'shape'), 't needs to be a np.ndarray'
+    assert len(t.shape) == 2, 't needs to be an (n,k) array'
+    # Do transforms
+    dist = str2lst(dist)
+    k_dist = len(dist)
+    k_t = t.shape[1]
+    if (k_dist == 1) & (k_t > 1):
+        dist = broadcast_dist(dist, k_t)
+    if (k_dist > 1) & (k_t == 1):
+        t = np.tile(t, [1,k_dist])
+        d = np.tile(d, [1,k_dist])
+    return t, d, dist
 
 
 def broadcast_long(x:np.ndarray, k:int):

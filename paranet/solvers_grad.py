@@ -15,7 +15,7 @@ from scipy.optimize import minimize
 
 # Internal modules
 from paranet.gradient import grad_ll, log_lik
-from paranet.utils import is_vector, shape_scale_2vec, get_p_k, broadcast_dist
+from paranet.utils import is_vector, shape_scale_2vec, get_p_k, broadcast_td_dist, t_long
 
 def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or list) -> float:
     """
@@ -74,9 +74,12 @@ def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or
     """
     CARRIES OUT OPTIMIZATION FOR GRADIENT-BASED METHOD
     """
-    # Input checks
-    p, k = get_p_k(t)
-    dist = broadcast_dist(dist, k)
+    # Input transforms
+    t, d = t_long(t), t_long(d)
+    t, d, dist = broadcast_td_dist(t, d, dist)
+    # Currently we support two rows (p=# of scale + 1 for shape)
+    p = 2
+    k = t.shape[1]
     # Initialize parameters
     if x0 is None:
         x0 = np.zeros([p,k]) + 1
