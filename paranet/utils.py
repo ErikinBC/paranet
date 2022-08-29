@@ -12,6 +12,12 @@ from typing import Callable
 dist_valid = ['exponential', 'weibull', 'gompertz']
 
 
+def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
+    """Check that the input is approximately zero"""
+    return np.all(np.abs(x) < tol)
+    #assert , 'Absolute values of x are not close enough to zero'
+
+
 def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -> np.ndarray:
     """
     Calculates the derivative for a function over a single parameter (first argument)
@@ -58,9 +64,12 @@ def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
         print('gg is not a recordnized type')
 
 
-def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float) -> None:
+def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float, equals:bool=True) -> None:
     """Check: low <= x <= high"""
-    assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
+    if equals:
+        assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
+    else:
+        assert np.all((x > low) & (x < high)), 'x is not between (low,high)'
 
 
 def str2lst(x):

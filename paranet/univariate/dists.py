@@ -101,7 +101,7 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
         if d == 'weibull':
             q_mat[:,i] = (nlp[:,i] / scale[:,i]) ** (1/shape[:,i])
         if d == 'gompertz':
-            q_mat[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlp)
+            q_mat[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlp[:,i])
     return q_mat
 
 
