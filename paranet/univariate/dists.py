@@ -247,10 +247,10 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     return T_obs, D_cens
 
 
-class surv_dist():
+class univariate_dist():
     def __init__(self, dist:str, scale:float or np.ndarray or None=None, shape:float or np.ndarray or None=None) -> None:
         """
-        Backbone class for parametric survival distributions. Choice of distribution will determine the call of other functions.
+        Backbone class for univriate parametric survival distributions. Choice of distribution will determine the call of other functions.
 
         Inputs
         ------
@@ -284,11 +284,8 @@ class surv_dist():
         if 'exponential' in self.didx:
             idx_exp = self.didx['exponential']
             self.shape[:,idx_exp] = self.shape[:,idx_exp]*0 + 1
-        
-
-    def check_t(self, t):
-        assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'
-
+    
+    
     def hazard(self, t):
         return hazard(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 

@@ -156,3 +156,4 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
         if d == 'gompertz':
             q_mat[:,i] = 1/alpha[:,i] * np.log(1 + alpha[:,i]/risk[:,i]*nlp[:,i])
     return q_mat
+

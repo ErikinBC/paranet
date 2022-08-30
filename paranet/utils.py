@@ -15,7 +15,18 @@ dist_valid = ['exponential', 'weibull', 'gompertz']
 def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
     """Check that the input is approximately zero"""
     return np.all(np.abs(x) < tol)
-    #assert , 'Absolute values of x are not close enough to zero'
+
+
+def all_or_None(lst:list or np.ndarray) -> bool:
+    """Checks whether a list or array is either all None or not a single None"""
+    is_none = [z is None for z in lst]
+    not_none = [not z for z in is_none]
+    check = all(is_none) or all(not_none)
+    return check
+
+def not_none(x) -> bool:
+    """Checks that some input is not None"""
+    return x is not None
 
 
 def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -> np.ndarray:
