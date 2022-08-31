@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, MaxAbsScaler
 # Internal modules
 from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx
 from paranet.multivariate.dists import hazard_multi#, survival_multi, pdf_multi, quantile_multi
-from paranet.multivariate.utils import args_alpha_beta, has_args_init
+from paranet.multivariate.multi_utils import args_alpha_beta, has_args_init
 
 
 class parametric():
@@ -137,12 +137,16 @@ class parametric():
         -------
         A (possibly) transformed array or time values (t), covariates (x), number of distributions (k), and number of covariates (p)
         """
-        has_args = has_args_init(t, x, self.t, self.x)
-        if has_args:  # Use user-supplied parameters
-            t, x = t_long(t), t_long(x)
-            assert t.shape[0] == x.shape[0], 't and x need to have the same number of rows'
-        else:  # Use the inhereted attributes
-            t, x = self.t.copy(), self.x.copy()
+        has_arg1, has_arg2 = has_args_init(t, self.t, x, self.x)
+        if has_arg1:  # Use user-supplied parameters
+            t = t_long(t)
+        else:
+            t = self.t.copy()
+        if has_arg2:
+            x = t_long(x)
+        else:
+            x = self.x.copy()
+        assert t.shape[0] == x.shape[0], 't and x need to have the same number of rows'
         # (possibly) scale covariates
         if self.scale_x:
             if not_none(self.enc_x):  # Use the existing encoder
@@ -151,7 +155,7 @@ class parametric():
                 x = StandardScaler().fit_transform(x)
         # (possibly) scale time measurements
         if self.scale_t:
-            if not_none(self.enc_x):  # Use the existing encoder
+            if not_none(self.enc_t):  # Use the existing encoder
                 t = self.enc_t.transform(t)
             else:  # Transform x 
                 t = StandardScaler(with_mean=False).fit_transform(t)
@@ -181,30 +185,6 @@ class parametric():
         alpha_beta = args_alpha_beta(k, p, alpha, beta, self.alpha, self.beta)
         haz_mat = hazard_multi(alpha_beta, x_trans, t_trans, self.dist)
         return haz_mat
-
-
-n, p = 20, 5
-np.random.seed(1)
-x_mat = np.random.rand(n, p)
-lst_dist = ['exponential','weibull','gompertz']
-k = len(lst_dist)
-alpha = np.random.rand(k)
-beta = np.exp(np.random.randn(p+1,k))
-# (i) Check that class can be initialized with onlly distributions
-enc_para = parametric(lst_dist)
-
-# (ii) Check that hazard can be calculated with initialized x and supplied alpha/beta
-enc_para = parametric(lst_dist, x=x_mat)
-
-# (iii) Check that hazard can be calculated with initialized initialized alpha/beta and supplied x
-enc_para = parametric(lst_dist, alpha=alpha, beta=beta)
-
-# (iv) Check that hazard can be calculated with initialized x, alpha, beta
-enc_para = parametric(lst_dist, x=x_mat, alpha=alpha, beta=beta)
-
-
-# When intercept is not default, then beta of (p,k) should error out
-
 
 
 

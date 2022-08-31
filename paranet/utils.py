@@ -17,6 +17,16 @@ def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
     return np.all(np.abs(x) < tol)
 
 
+def should_fail(fun, **kwargs):
+    """Test that a function evaluated for certain values fails"""
+    try:
+        failed = False
+        fun(**kwargs)
+    except:
+        failed = True
+    assert failed, 'Expected function to fail'
+
+
 def all_or_None(lst:list or np.ndarray) -> bool:
     """Checks whether a list or array is either all None or not a single None"""
     is_none = [z is None for z in lst]
