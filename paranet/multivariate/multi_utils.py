@@ -33,11 +33,16 @@ def args_alpha_beta(k:int, p:int, alpha_args:np.ndarray or None=None, beta_args:
     -------
     A (p+1,k) array of weights
     """
-    has_args = has_args_init(alpha_args, alpha_init, beta_args, beta_init)
-    if has_args:
-        alpha_beta = np.vstack((t_wide(alpha_args), t_wide(beta_args)))
-    else:  # Use initialized values
-        alpha_beta = np.vstack((t_wide(alpha_init), t_wide(beta_init)))
+    has_arg1, has_arg2 = has_args_init(alpha_args, alpha_init, beta_args, beta_init)
+    if has_arg1:
+        alpha = t_wide(alpha_args)
+    else:
+        alpha = t_wide(alpha_init)
+    if has_arg2:
+        beta = t_wide(beta_args)
+    else:
+        beta = t_wide(beta_init)
+    alpha_beta = np.vstack((alpha, beta))
     assert alpha_beta.shape[1] == k, f'alpha and beta need to have {k} columns'
     assert alpha_beta.shape[0] == p + 1, f'alpha needs to a (row) vector and beta needs to be of length {p}'
     return alpha_beta

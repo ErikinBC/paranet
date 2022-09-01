@@ -79,7 +79,7 @@ class parametric():
         if self.has_dt:
             self.t, self.d = t_long(t), t_long(d)
             self.k_t = self.t.shape[1]
-            assert self.t.shape == self.d.shape[1], 't and d need to be the same shape'
+            assert self.t.shape == self.d.shape, 't and d need to be the same shape'
             if self.scale_t:
                 self.enc_t = MaxAbsScaler().fit(self.t)
             if self.has_x:
