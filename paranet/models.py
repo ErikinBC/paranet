@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler
 # Internal modules
 from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx
-from paranet.multivariate.dists import hazard_multi#, survival_multi, pdf_multi, quantile_multi
+from paranet.multivariate.dists import hazard_multi, survival_multi, pdf_multi#, quantile_multi
 from paranet.multivariate.multi_utils import args_alpha_beta, has_args_init
 
 
@@ -175,7 +175,10 @@ class parametric():
 
         Inputs
         ------
-        t:              An 
+        t:              A (n,k) array of time values
+        x:              A (n,p) array of covariates
+        alpha:          A (k,1) array of shape values
+        beta:           A (p,k) array of scale parameters
 
         Outputs
         -------
@@ -186,5 +189,18 @@ class parametric():
         haz_mat = hazard_multi(alpha_beta, x_trans, t_trans, self.dist)
         return haz_mat
 
+    def survival(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
+        """Calculate the survival probability (see hazard)"""
+        t_trans, x_trans, k, p = self.process_t_x(t, x)
+        alpha_beta = args_alpha_beta(k, p, alpha, beta, self.alpha, self.beta)
+        surv_mat = survival_multi(alpha_beta, x_trans, t_trans, self.dist)
+        return surv_mat
+
+    def pdf(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
+        """Calculate the density (see hazard)"""
+        t_trans, x_trans, k, p = self.process_t_x(t, x)
+        alpha_beta = args_alpha_beta(k, p, alpha, beta, self.alpha, self.beta)
+        pdf_mat = pdf_multi(alpha_beta, x_trans, t_trans, self.dist)
+        return pdf_mat
 
 

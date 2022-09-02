@@ -61,7 +61,7 @@ def hazard_multi(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, dist:list or
         if d == 'weibull':
             h_mat[:,i] = risk[:,i] * alpha[:,i] * t[:,i]**(alpha[:,i]-1)
         if d == 'gompertz':
-            h_mat[:,i] = alpha[:,i] * np.exp(alpha[:,i]*t[:,i])
+            h_mat[:,i] = risk[:,i] * np.exp(alpha[:,i]*t[:,i])
     return h_mat
 
 
