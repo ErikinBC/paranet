@@ -6,7 +6,7 @@ Creates distribution/gradient specific functions for the multivariate parametric
 import numpy as np
 
 # Internal modules
-from paranet.utils import broadcast_dist, broadcast_long, dist2idx, check_interval, t_long
+from paranet.utils import broadcast_dist, broadcast_long, dist2idx, check_interval, t_long, try_squeeze
 
 
 def check_multi_input(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, dist:list) -> None:
@@ -105,37 +105,49 @@ def pdf_multi(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, dist:list or st
     return f
 
 
-def broadcast_percentile(percentile:np.ndarray or float, n:int, k:int):
+def broadcast_percentile(percentile:np.ndarray or float, n:int, k:int) -> np.ndarray:
     """
-    Broadcast a float or array to an n
+    Broadcast a float or (q,) array to an (n,k,q) array
 
     Inputs
     ------
     p:              Percentile input argument
     n:              Length
     k:              Number of columns
+
+    Returns
+    -------
+    (n,k,q) array of percentiles
     """
+    # Input checks
+    percentile = t_long(percentile)
     check_interval(percentile, 0, 1, equals=False)
-    if isinstance(percentile, float):
-        return np.zeros([n,k]) + percentile
-    else:
-        if not isinstance(percentile, np.ndarray):
-            percentile = np.array(percentile)
-        if len(percentile.shape) == 1:
-            assert len(percentile) == n, 'If percentile is flat, it should be of length n'
-            return np.tile(t_long(percentile), [1,k])
-        else:
-            assert percentile.shape == (n, k), 'If percentile has two dimensions, it should match (n,k)'
-            return percentile
+    # Broadcast
+    q = len(percentile)
+    p_mat = np.tile(np.tile(percentile,[1,n]),[k,1,1]).transpose([2,0,1])
+    # Return checks
+    assert len(p_mat.shape) == 3, 'Expected p_mat to be of (n,k,q)'
+    assert p_mat.shape == (n, k, q), 'Expected p_mat to be of (n,k,q)'
+    return p_mat
 
 
-def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str) -> np.ndarray:
+def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, squeeze:bool=True) -> np.ndarray:
     """
-    Calculates the quantiles for the relevant classes with a matrix of covariates; see hazard_multi() for more details
+    Calculates the quantiles for the relevant classes with a matrix of covariates.
+    
+    Inputs
+    ------
+    squeeze:            Should the third axis be squeezed out if len(percentile)==1? (default=True)
+    See hazard_multi()
+
+    Returns
+    -------
+    An (n,k,q) array where n is the number of rows of x, k is the number of distributions (i.e. columns of alpha_beta), and q is the length of the quantile array being evaluated
     """
     # Input checks and transforms
     k, n = alpha_beta.shape[1], x.shape[0]
     percentile = broadcast_percentile(percentile, n, k)
+    q = percentile.shape[2]
     check_multi_input(alpha_beta, x, percentile, dist)
     dist = broadcast_dist(dist, k)
 
@@ -143,17 +155,96 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
     alpha = alpha_beta[[0]]
     beta = alpha_beta[1:]
     risk = np.exp(x.dot(beta))
+    # Add on dimension for quantile
+    alpha = np.tile(alpha, [q,1,1]).transpose([1,2,0])
+    risk = np.tile(risk, [q,1,1]).transpose([1,2,0])
 
     # Calculate quantile
     nlp = -np.log(1 - percentile)
-    q_mat = np.zeros([n, k])
+    q_mat = np.zeros(percentile.shape)
     didx = dist2idx(dist)
     for d, i in didx.items():
         if d == 'exponential':
-            q_mat[:,i] = nlp[:,i] / risk[:,i]
+            q_mat[:,i,:] = nlp[:,i,:] / risk[:,i,:]
         if d == 'weibull':
-            q_mat[:,i] = (nlp[:,i] / risk[:,i]) ** (1/alpha[:,i])
+            q_mat[:,i,:] = (nlp[:,i,:] / risk[:,i,:]) ** (1/alpha[:,i,:])
         if d == 'gompertz':
-            q_mat[:,i] = 1/alpha[:,i] * np.log(1 + alpha[:,i]/risk[:,i]*nlp[:,i])
+            q_mat[:,i,:] = 1/alpha[:,i,:] * np.log(1 + alpha[:,i,:]/risk[:,i,:]*nlp[:,i,:])
+    if squeeze:
+        q_mat = try_squeeze(q_mat, axis=2)
     return q_mat
 
+
+def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None):
+    """
+    Generate n_sim samples from each distribution
+
+    Inputs
+    ------
+    n_sim:              Integer indicating the number of samples to generate
+    seed:               Reproducibility seed (default=None)
+    See hazard_multi() for remaining parameters
+
+    Returns
+    -------
+    (n_sim x k) np.ndarray of un-censored time-to-event measurements
+    """
+    # Input checks and transforms
+    k, n = alpha_beta.shape[1], x.shape[0]
+    dist = broadcast_dist(dist, k)
+
+    # Calculate risks
+    alpha = alpha_beta[[0]]
+    beta = alpha_beta[1:]
+    risk = np.exp(x.dot(beta))
+
+    # Generate randomness
+    if seed is not None:
+        np.random.seed(seed)
+    nlU = -np.log(np.random.rand(n_sim, k))
+    T_act = np.zeros([n_sim, k])
+    # Calculate quantile
+    didx = dist2idx(dist)
+    for d, i in didx.items():
+        if d == 'exponential':
+            T_act[:,i] = nlU[:,i] / risk[:,i]
+        if d == 'weibull':
+            T_act[:,i] = (nlU[:,i] / risk[:,i]) ** (1/alpha[:,i])
+        if d == 'gompertz':
+            T_act[:,i] = 1/alpha[:,i] * np.log(1 + alpha[:,i]/risk[:,i]*nlU[:,i])
+    return T_act
+
+
+def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None):
+    """
+    Generate n_sim samples from each distribution with censoring
+
+    Inputs
+    ------
+    n_sim:              Integer indicating the number of samples to generate
+    seed:               Reproducibility seed (default=None)
+    See rvs_T_multi() for remaining parameters
+
+    Returns
+    -------
+    (n_sim x k, n_sim x k) np.ndarray's of observed time-to-event measurements and censoring indicators (0==censored)
+    """
+    # Input checks
+    check_interval(censoring, 0, 1)
+
+    # Calculate the "actual" time-to-event
+    T_act = rvs_T_multi(n_sim, alpha_beta, x, dist, seed)
+    _, k = T_act.shape
+    if censoring == 0:  # Return actual if there is not censoring
+        D_cens = np.ones(T_act.shape)
+        return T_act, D_cens
+
+    # Determine the "scale" from an exponential needed to obtain censoring
+    # scale_C = find_exp_scale_censoring_multi()
+    scale_C = np.random.rand(1, k)
+
+    # Generate data from exponential distribution
+    T_cens = -np.log(np.random.rand(n_sim, k)) / scale_C
+    D_cens = np.where(T_cens <= T_act, 0, 1)
+    T_obs = np.where(D_cens == 1, T_act, T_cens)
+    return T_obs, D_cens

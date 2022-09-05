@@ -7,12 +7,19 @@ import numpy as np
 # Internal modules
 from paranet.utils import not_none, t_wide
 
-def has_args_init(arg1, init1, arg2, init2) -> bool:
+
+def has_args_init(arg, init):
+    """Checks that there is is least value for arg or init"""
+    has_arg = not_none(arg)
+    assert has_arg or not_none(init), 'if argument1 is not supplied, init1 must exist'
+    return has_arg
+
+
+def has_args_init2(arg1, init1, arg2, init2) -> bool:
     """Checks that is at least one value for arg{i} or init{i}"""
-    # If argument exists, it willl be used
-    has_arg1, has_arg2 = not_none(arg1), not_none(arg2)
-    assert has_arg1 or not_none(init1), 'if argument1 is not supplied, init1 must exist'
-    assert has_arg2 or not_none(init2), 'if argument2 is not supplied, init2 must exist'
+    # If argument exists, it will be used
+    has_arg1 = has_args_init(arg1, init1)
+    has_arg2 = has_args_init(arg2, init2)
     return has_arg1, has_arg2
 
 
@@ -33,7 +40,7 @@ def args_alpha_beta(k:int, p:int, alpha_args:np.ndarray or None=None, beta_args:
     -------
     A (p+1,k) array of weights
     """
-    has_arg1, has_arg2 = has_args_init(alpha_args, alpha_init, beta_args, beta_init)
+    has_arg1, has_arg2 = has_args_init2(alpha_args, alpha_init, beta_args, beta_init)
     if has_arg1:
         alpha = t_wide(alpha_args)
     else:

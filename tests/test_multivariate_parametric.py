@@ -10,6 +10,27 @@ from paranet.models import parametric
 from paranet.utils import should_fail, dist_valid, close2zero
 
 
+def test_rvs_quantile(n_sim:int=1000, tol:float=1e-2, seed:int=1):
+    """Check that empirical quantiles are close to theoretical"""
+    alpha_seq = np.arange(0.1, 1, 0.1)  # Percentiles to check
+    n, p, k = 100, 4, 3
+    np.random.seed(seed)
+    alpha = np.random.rand(1,k)
+    beta = np.random.rand(p+1,k)
+    x = np.random.randn(n, p)
+    for dist in dist_valid:
+        print(f'--- Testing distribution {dist} ---')
+        enc_dist = parametric(dist, x=x, alpha=alpha, beta=beta, add_int=True)
+        t, _ = enc_dist.rvs(censoring=0, n_sim=n, seed=seed)
+        q_emp = np.quantile(t, alpha_seq, axis=0)
+        q_theory = enc_dist.quantile(alpha_seq, x)
+        q_err = np.abs(q_emp - q_theory).max()
+        assert q_err < tol, f'Empirical quantiles do not align with theoretical for {dist}: {q_err}'
+    print('~ test_rvs_quantile(): success ~')
+
+
+
+
 def test_check_dists(n:int=20, p:int=5, lst_dist:list=dist_valid, seed:int=1):
     """
     Check that the different distributions (hazard/survival/pdf) work as expected for parametric
@@ -41,8 +62,6 @@ def test_check_dists(n:int=20, p:int=5, lst_dist:list=dist_valid, seed:int=1):
         should_fail(getattr(enc_para, method), t=np.c_[t,t],x=x_mat,alpha=alpha,beta=beta)
 
         # (iii) Check that method can be calculated with initialized x and supplied alpha/beta
-        #if method == 'survival':
-        #breakpoint()
         enc_para = parametric(lst_dist, x=x_mat, scale_t=False)
         mat_x1 = getattr(enc_para, method)(t=t, alpha=alpha, beta=beta)[1:]
         # Removing one row should change the scaling factor
@@ -64,5 +83,12 @@ def test_check_dists(n:int=20, p:int=5, lst_dist:list=dist_valid, seed:int=1):
 if __name__ == "__main__":
     # (i) Check that MLL solver works
     n, p, seed = 20, 5, 1
-    test_check_dists(n, p, dist_valid, seed)
+    #test_check_dists(n, p, dist_valid, seed)
 
+    # (ii) Check that quantile works as expected
+    n_sim = 100
+    tol = 1e-2
+    seed = 1
+    test_rvs_quantile(n_sim, tol, seed)
+
+    # (x) CHECK THAT WE CAN GENERATE WITH X==1

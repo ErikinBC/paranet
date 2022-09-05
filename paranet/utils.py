@@ -12,6 +12,18 @@ from typing import Callable
 dist_valid = ['exponential', 'weibull', 'gompertz']
 
 
+def try_squeeze(x:np.ndarray, axis:int or None=None) -> np.ndarray:
+    """Implements np.sqeeze but will not squeeze axis if length > 1"""
+    if axis is not None:
+        if x.shape[axis] == 1:
+            return np.squeeze(x, axis)
+        else:
+            return x
+    else:
+        return np.squeeze(x, axis)
+
+
+
 def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
     """Check that the input is approximately zero"""
     return np.all(np.abs(x) < tol)
@@ -193,7 +205,7 @@ def is_vector(x:np.ndarray) -> None:
     assert check, 'Dimensionality not as expected'
 
 
-def get_p_k(t:np.ndarray) -> tuple[int, int]:
+def _get_p_k(t:np.ndarray) -> tuple[int, int]:
     """
     RETURN THE DIMENSIONALITY OF THE DATA INPUT ARRAY
 

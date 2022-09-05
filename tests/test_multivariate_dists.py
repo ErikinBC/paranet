@@ -52,12 +52,17 @@ def test_broadcast_quantile(n:int=20, p:int=5, seed:int=1, zero_tol:float=1e-10)
     alpha_beta = np.random.rand(p+1, k)
 
     # (i) Check that the float and vector works
-    di_p = {'val':0.5, 'vec':np.linspace(0.1, 0.9, n)}
+    di_p = {'val':0.5, 'vec':np.arange(0.1,1,0.1)}
     for tt, val in di_p.items():
+        print(f'- Checking quantile for {tt} -')
         # No broadcasting
         quant_all = quantile_multi(val, alpha_beta, x, dist_valid)
         assert np.all(quant_all.var(1) > 0), 'Different dists should have different quantiles'
-        assert quant_all.shape == (n, k), 'Should have dimensions (n,k)'
+        if isinstance(val, float):
+            assert quant_all.shape == (n, k), 'Should have dimensions (n,k)'
+        else:
+            assert quant_all.shape == (n, k, len(val)), 'Should have dimensions (n,k)'
+        
         for i, dist in enumerate(dist_valid):
             # Broadcasting distribution
             quant_broadcast = quantile_multi(val, alpha_beta, x, dist)
@@ -67,14 +72,6 @@ def test_broadcast_quantile(n:int=20, p:int=5, seed:int=1, zero_tol:float=1e-10)
             quant_zero_covar = quantile_multi(val, alpha_beta*0+1, x*0, dist)
             assert close2zero(quant_zero_covar.var(1), zero_tol) or close2zero(quant_zero_covar.var(0), zero_tol), 'At least one dimension should have zero variation'
 
-    # (ii) Check that the matrix works
-    mat_p = np.random.rand(n, k)
-    quant_all = quantile_multi(mat_p, alpha_beta, x, dist_valid)
-    assert quant_all.shape == (n, k), 'Should have dimensions (n,k)'
-    for i, dist in enumerate(dist_valid):
-        # Broadcasting disttribution
-        quant_broadcast = quantile_multi(val, alpha_beta, x, dist)
-        assert quant_broadcast.shape == (n, k), 'Should have dimensions (n,k)'
 
 
 if __name__ == "__main__":

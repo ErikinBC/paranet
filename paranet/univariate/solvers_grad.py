@@ -15,7 +15,7 @@ from scipy.optimize import minimize
 
 # Internal modules
 from paranet.univariate.gradient import grad_ll, log_lik
-from paranet.utils import is_vector, shape_scale_2vec, get_p_k, broadcast_td_dist, t_long
+from paranet.utils import is_vector, shape_scale_2vec, _get_p_k, broadcast_td_dist, t_long
 
 def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or list) -> float:
     """
@@ -34,7 +34,7 @@ def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or 
     """
     # Input checks/transform
     is_vector(shape_scale)  # Should be a flattened vector
-    p, k = get_p_k(t)
+    p, k = _get_p_k(t)
     # Reshape into order needed for log-likelihood function
     shape_scale = shape_scale.reshape([k,p]).T
     assert shape_scale.shape[0] >= 2, 'There should be at least two rows (first is shape, second is scale)'
@@ -60,7 +60,7 @@ def grad_ll_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) ->
     """
     # Input checks/transform
     is_vector(shape_scale)  # Should be a flattened vector
-    p, k = get_p_k(t)
+    p, k = _get_p_k(t)
     # Reshape into order needed for log-likelihood function
     shape_scale = shape_scale.reshape([k,p]).T
     assert shape_scale.shape[0] >= 2, 'There should be at least two rows (first is shape, second is scale)'
