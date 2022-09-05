@@ -10,6 +10,26 @@ from paranet.models import parametric
 from paranet.utils import should_fail, dist_valid, close2zero
 
 
+def test_check_censoring(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250, tol:float=1e-2, seed:int=1):
+    """Make sure that different censoring targets are met"""
+    # Censoring values to check
+    censor_seq = np.arange(0, 1, 0.1)
+    
+    # Generate data
+    np.random.seed(seed)
+    k = len(lst_dist)
+    alpha = np.random.rand(1,k) + 0.5
+    beta = np.random.rand(p+1,k) + 0.5
+    x = np.random.randn(n, p)
+    enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
+
+    # Check different censoring values
+    for censoring in censor_seq:
+        print(f'- Checking for censoring of {censoring} -')
+        _, d = enc_dist.rvs(censoring=censoring, n_sim=n_sim, seed=seed)
+        breakpoint()
+
+
 def test_rvs_quantile(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250, tol:float=1e-2, seed:int=1):
     """Check that empirical quantiles are close to theoretical"""
     # Percentiles to check
@@ -21,9 +41,9 @@ def test_rvs_quantile(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250
     alpha = np.random.rand(1,k) + 0.5
     beta = np.random.rand(p+1,k) + 0.5
     x = np.random.randn(n, p)
+    enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
 
     # Generate data to compare to quantiles
-    enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
     t, _ = enc_dist.rvs(censoring=0, n_sim=n_sim, seed=seed)
     q_emp = np.quantile(t, alpha_seq, axis=2).transpose([1,2,0])
     q_theory = enc_dist.quantile(alpha_seq, x)
@@ -86,12 +106,14 @@ def test_check_dists(n:int=20, p:int=5, lst_dist:list=dist_valid, seed:int=1):
 if __name__ == "__main__":
     # (i) Check that MLL solver works
     n, p, seed = 20, 4, 1
-    test_check_dists(n, p, dist_valid, seed)
+    #test_check_dists(n, p, dist_valid, seed)
 
     # (ii) Check that quantile works as expected
     n_sim = 250000
     tol = 0.1
     seed = 1
-    test_rvs_quantile(n=n, p=p, lst_dist=dist_valid, n_sim=n_sim, tol=tol, seed=seed)
+    #test_rvs_quantile(n=n, p=p, lst_dist=dist_valid, n_sim=n_sim, tol=tol, seed=seed)
+
+    # (iii) Check that censoring values are as expected
 
     # (x) CHECK THAT WE CAN GENERATE WITH X==1

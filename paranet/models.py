@@ -63,7 +63,7 @@ class parametric():
         self.x, self.enc_x, self.p_x, self.p = None, None, None, None
         if self.has_x:
             self.x = t_long(x)
-            self.p_x = x.shape[1]
+            self.p_x = self.x.shape[1]
             self.p = self.p_x + int(self.add_int)
             if self.scale_x:
                 self.enc_x = StandardScaler().fit(self.x)

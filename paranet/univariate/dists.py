@@ -105,15 +105,15 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
     return q_mat
 
 
-def integral_for_censoring(t:np.ndarray, scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str) -> np.ndarray:
+def integral_for_censoring(t:float or np.ndarray, scale_C:float, scale_T:float, shape_T:float, dist_T:str) -> float:
     f_dist = pdf(t, scale_T, shape_T, dist_T)
     # Note the shape input doesn't matter here
-    S_dist = survival(t, scale_C, scale_C, 'exponential')
-    f_int = f_dist * S_dist
+    F_exp = 1 - survival(t, scale_C, scale_C, 'exponential')
+    f_int = f_dist * F_exp
     return f_int
 
 
-def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, alpha:float=0.001) -> np.ndarray:
+def censoring_exponential(scale_C:float, scale_T:float, shape_T:float, dist_T:str, alpha:float=0.001) -> float:
     """
     Function to calculate the probability that P(C < T), where T is the target distribution of interest (defined by scale/shape), and C is an exponential distribution that will act as the censoring distribution where T_obs = T if T<C, and C if T>C
     
@@ -129,21 +129,14 @@ def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.nda
     -------
     A 1xk vector of vector of censoring probabilities P(C < T)
     """
-    # Input chekcs
-    scale_C, scale_T, shape_T = t_wide(scale_C), t_wide(scale_T), t_wide(shape_T)
-    assert scale_C.shape == scale_T.shape == shape_T.shape, 'scale and shape need to have same dims'
     # (i) Calculate a reasonable upper-bound to integrate over
     b_upper = 2 * quantile(1-alpha, scale_T, shape_T, dist_T)
-    assert b_upper.shape == scale_C.shape, 'Integral upper bound needs to have same dims'
     # (ii) Loop over the columns
-    censoring = np.zeros(scale_C.shape)
-    for k in range(scale_C.shape[1]):
-        integral_k, _ = quad(func=integral_for_censoring, a=0, b=b_upper, args=(scale_C, scale_T, shape_T, dist_T))
-        censoring[:,k] = 1 - integral_k
+    censoring, _ = quad(func=integral_for_censoring, a=0, b=b_upper, args=(scale_C, scale_T, shape_T, dist_T))
     return censoring
 
 
-def err2_censoring_exponential(scale_C:np.ndarray, censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, ret_squared:bool=True):
+def err2_censoring_exponential(scale_C:float, censoring:float, scale_T:float, shape_T:float, dist_T:str, ret_squared:bool=True) -> float:
     """Calculates squared error between target censoring and expected value"""
     expected_censoring = censoring_exponential(scale_C, scale_T, shape_T, dist_T)
     if ret_squared:

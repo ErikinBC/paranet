@@ -4,9 +4,13 @@ Creates distribution/gradient specific functions for the multivariate parametric
 
 # External modules
 import numpy as np
+from scipy.stats import lognorm
+from scipy.integrate import dblquad
 
 # Internal modules
-from paranet.utils import broadcast_dist, broadcast_long, dist2idx, check_interval, t_long, try_squeeze
+from paranet.univariate.dists import pdf as pdf_uni
+from paranet.univariate.dists import survival as survival_uni
+from paranet.utils import broadcast_dist, broadcast_long, dist2idx, check_interval, t_long, t_wide, try_squeeze
 
 
 def check_multi_input(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, dist:list) -> None:
@@ -175,6 +179,29 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
     return q_mat
 
 
+def integral_for_censoring_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:float, shape_T:float or np.ndarray, dist_T:str, l2_beta:float) -> float:
+    """
+    Returns the integral for int_0^infty int_0^infty F_C(time) f_{risk}(time;shape) f_{lambda}(risk); 0; l2) du di
+
+    i) F_C(time) is the CDF of an Exponential(scale_C)
+    ii) f_{risk}(time; shape) is the pdf of the target dist with scale (i) & shape
+    iii) f_{lambda}(risk) is the pdf of the lognormal distribution with mean 0 and variance l2
+
+    Inputs
+    ------
+    t:          Time value 
+    r:          Risk (aka scale parameter)
+    """
+    # Calculate densitities and CDF
+    f_dist = pdf_uni(time, risk, shape_T, dist_T)
+    # Shape parameter is irrelevant
+    F_exp = 1 - survival_uni(time, scale_C, scale_C, 'exponential')
+    f_lam = lognorm(s=1,loc=0,scale=l2_beta).pdf(risk)
+    # Return integral
+    f_int = f_dist * F_exp * f_lam
+    return f_int
+
+
 def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None):
     """
     Generate n_sim samples from each (n,k) distribution
@@ -222,6 +249,7 @@ def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str
     return T_act
 
 
+
 def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None):
     """
     Generate n_sim samples from each distribution with censoring
@@ -246,9 +274,9 @@ def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, d
         return T_act, D_cens
 
     # Determine the "scale" from an exponential needed to obtain censoring
-    # scale_C = find_exp_scale_censoring_multi()
-    k = T_act.shape[1]
-    scale_C = np.random.rand(1, k, 1)
+    scale_C = find_exp_scale_censoring_multi()
+    # k = T_act.shape[1]
+    # scale_C = np.random.rand(1, k, 1)
 
     # Generate data from exponential distribution
     T_cens = -np.log(np.random.rand(*T_act.shape)) / scale_C
