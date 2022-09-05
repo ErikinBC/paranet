@@ -10,24 +10,27 @@ from paranet.models import parametric
 from paranet.utils import should_fail, dist_valid, close2zero
 
 
-def test_rvs_quantile(n_sim:int=1000, tol:float=1e-2, seed:int=1):
+def test_rvs_quantile(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250, tol:float=1e-2, seed:int=1):
     """Check that empirical quantiles are close to theoretical"""
-    alpha_seq = np.arange(0.1, 1, 0.1)  # Percentiles to check
-    n, p, k = 100, 4, 3
-    np.random.seed(seed)
-    alpha = np.random.rand(1,k)
-    beta = np.random.rand(p+1,k)
-    x = np.random.randn(n, p)
-    for dist in dist_valid:
-        print(f'--- Testing distribution {dist} ---')
-        enc_dist = parametric(dist, x=x, alpha=alpha, beta=beta, add_int=True)
-        t, _ = enc_dist.rvs(censoring=0, n_sim=n, seed=seed)
-        q_emp = np.quantile(t, alpha_seq, axis=0)
-        q_theory = enc_dist.quantile(alpha_seq, x)
-        q_err = np.abs(q_emp - q_theory).max()
-        assert q_err < tol, f'Empirical quantiles do not align with theoretical for {dist}: {q_err}'
-    print('~ test_rvs_quantile(): success ~')
+    # Percentiles to check
+    alpha_seq = np.arange(0.1, 1, 0.1)  
 
+    # Generate data
+    np.random.seed(seed)
+    k = len(lst_dist)
+    alpha = np.random.rand(1,k) + 0.5
+    beta = np.random.rand(p+1,k) + 0.5
+    x = np.random.randn(n, p)
+
+    # Generate data to compare to quantiles
+    enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
+    t, _ = enc_dist.rvs(censoring=0, n_sim=n_sim, seed=seed)
+    q_emp = np.quantile(t, alpha_seq, axis=2).transpose([1,2,0])
+    q_theory = enc_dist.quantile(alpha_seq, x)
+    assert q_emp.shape == q_theory.shape, 'Quantile output shapes not as expected'
+    q_err = np.abs(q_emp - q_theory).max()
+    assert q_err < tol, f'Empirical quantiles do not align with theoretical: {q_err}'
+    print('~ test_rvs_quantile(): success ~')
 
 
 
@@ -82,13 +85,13 @@ def test_check_dists(n:int=20, p:int=5, lst_dist:list=dist_valid, seed:int=1):
 
 if __name__ == "__main__":
     # (i) Check that MLL solver works
-    n, p, seed = 20, 5, 1
-    #test_check_dists(n, p, dist_valid, seed)
+    n, p, seed = 20, 4, 1
+    test_check_dists(n, p, dist_valid, seed)
 
     # (ii) Check that quantile works as expected
-    n_sim = 100
-    tol = 1e-2
+    n_sim = 250000
+    tol = 0.1
     seed = 1
-    test_rvs_quantile(n_sim, tol, seed)
+    test_rvs_quantile(n=n, p=p, lst_dist=dist_valid, n_sim=n_sim, tol=tol, seed=seed)
 
     # (x) CHECK THAT WE CAN GENERATE WITH X==1

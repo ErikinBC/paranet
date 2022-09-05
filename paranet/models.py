@@ -270,16 +270,31 @@ class parametric():
         return pdf_mat
 
 
-    def quantile(self, percentile:np.ndarray or float, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
-        """Calculate the density (see hazard)"""
+    def quantile(self, percentile:np.ndarray or float, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None, squeeze:bool=True) -> np.ndarray:
+        """
+        Calculate the quantiles for different percentiles.
+
+        Inputs
+        ------
+        percentile:            A float or (q,) array specifying the percentiles we will calculate the quantile for: q=F^{-1}(p|x)
+        squeeze:               Will return an (n,k) if percentile is of length one (default=True)
+        See hazard() for other arguments
+        
+        Returns
+        -------
+        An (n,k,q) array of quantiles for the for each (n,k) point corresponding to a different distribution.
+        """
         x_trans, alpha_beta = self._trans_x_alpha_beta(x=x, alpha=alpha, beta=beta)
-        q_mat = quantile_multi(percentile, alpha_beta, x_trans, self.dist)
+        q_mat = quantile_multi(percentile, alpha_beta, x_trans, self.dist, squeeze)
         return q_mat
 
 
-    def rvs(self, censoring:float, n_sim:int, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None):
+    def rvs(self, censoring:float, n_sim:int, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None)  -> np.ndarray:
         """
-        Generate n_sim samples from the covariate distribution
+        Generate n_sim samples from the covariate distribution.
+
+        Returns
+
         """
         x_trans, alpha_beta = self._trans_x_alpha_beta(x=x, alpha=alpha, beta=beta)
         t, d = rvs_multi(censoring=censoring, n_sim=n_sim, alpha_beta=alpha_beta, x=x_trans, dist=self.dist, seed=seed)

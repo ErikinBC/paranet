@@ -156,9 +156,9 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
     beta = alpha_beta[1:]
     risk = np.exp(x.dot(beta))
     # Add on dimension for quantile
-    alpha = np.tile(alpha, [q,1,1]).transpose([1,2,0])
-    risk = np.tile(risk, [q,1,1]).transpose([1,2,0])
-
+    alpha = np.expand_dims(alpha, 2)
+    risk = np.expand_dims(risk, 2)
+    
     # Calculate quantile
     nlp = -np.log(1 - percentile)
     q_mat = np.zeros(percentile.shape)
@@ -177,7 +177,7 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
 
 def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None):
     """
-    Generate n_sim samples from each distribution
+    Generate n_sim samples from each (n,k) distribution
 
     Inputs
     ------
@@ -187,10 +187,12 @@ def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str
 
     Returns
     -------
-    (n_sim x k) np.ndarray of un-censored time-to-event measurements
+    (n, k, n_sim) array of (uncensored) time-to-event measurements
     """
     # Input checks and transforms
-    k, n = alpha_beta.shape[1], x.shape[0]
+    n, p = x.shape
+    p_ab, k = alpha_beta.shape
+    assert p == p_ab-1, 'Number of columns of x should be equal to number of rows of alpha_beta less one'
     dist = broadcast_dist(dist, k)
 
     # Calculate risks
@@ -198,20 +200,25 @@ def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str
     beta = alpha_beta[1:]
     risk = np.exp(x.dot(beta))
 
+    # Expand dimensions for broadcasting
+    alpha = np.expand_dims(alpha, 2)
+    risk = np.expand_dims(risk, 2)
+
     # Generate randomness
     if seed is not None:
         np.random.seed(seed)
-    nlU = -np.log(np.random.rand(n_sim, k))
-    T_act = np.zeros([n_sim, k])
+    nlU = -np.log(np.random.rand(n, k, n_sim))
+    
     # Calculate quantile
+    T_act = np.zeros(nlU.shape)
     didx = dist2idx(dist)
     for d, i in didx.items():
         if d == 'exponential':
-            T_act[:,i] = nlU[:,i] / risk[:,i]
+            T_act[:,i,:] = nlU[:,i,:] / risk[:,i,:]
         if d == 'weibull':
-            T_act[:,i] = (nlU[:,i] / risk[:,i]) ** (1/alpha[:,i])
+            T_act[:,i,:] = (nlU[:,i,:] / risk[:,i,:]) ** (1/alpha[:,i,:])
         if d == 'gompertz':
-            T_act[:,i] = 1/alpha[:,i] * np.log(1 + alpha[:,i]/risk[:,i]*nlU[:,i])
+            T_act[:,i,:] = 1/alpha[:,i,:] * np.log(1 + alpha[:,i,:]/risk[:,i,:]*nlU[:,i,:])
     return T_act
 
 
@@ -234,17 +241,17 @@ def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, d
 
     # Calculate the "actual" time-to-event
     T_act = rvs_T_multi(n_sim, alpha_beta, x, dist, seed)
-    _, k = T_act.shape
     if censoring == 0:  # Return actual if there is not censoring
         D_cens = np.ones(T_act.shape)
         return T_act, D_cens
 
     # Determine the "scale" from an exponential needed to obtain censoring
     # scale_C = find_exp_scale_censoring_multi()
-    scale_C = np.random.rand(1, k)
+    k = T_act.shape[1]
+    scale_C = np.random.rand(1, k, 1)
 
     # Generate data from exponential distribution
-    T_cens = -np.log(np.random.rand(n_sim, k)) / scale_C
+    T_cens = -np.log(np.random.rand(*T_act.shape)) / scale_C
     D_cens = np.where(T_cens <= T_act, 0, 1)
     T_obs = np.where(D_cens == 1, T_act, T_cens)
     return T_obs, D_cens
