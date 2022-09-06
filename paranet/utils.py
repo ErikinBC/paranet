@@ -97,9 +97,13 @@ def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
         print('gg is not a recordnized type')
 
 
-def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float, equals:bool=True) -> None:
-    """Check: low <= x <= high"""
-    if equals:
+def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float, equals_both:bool=False, equals_low:bool=False, equals_high:bool=False) -> None:
+    """Check that an array or float is between low <= x <= high"""
+    if equals_low and not equals_high:
+        assert np.all((x >= low) & (x < high)), 'x is not between [low,high)'
+    elif equals_high and not equals_low:
+        assert np.all((x > low) & (x <= high)), 'x is not between [low,high)'
+    elif equals_both or (equals_low and equals_high):
         assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
     else:
         assert np.all((x > low) & (x < high)), 'x is not between (low,high)'

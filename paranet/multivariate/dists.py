@@ -127,7 +127,7 @@ def broadcast_percentile(percentile:np.ndarray or float, n:int, k:int) -> np.nda
     """
     # Input checks
     percentile = t_long(percentile)
-    check_interval(percentile, 0, 1, equals=False)
+    check_interval(percentile, 0, 1)
     # Broadcast
     q = len(percentile)
     p_mat = np.tile(np.tile(percentile,[1,n]),[k,1,1]).transpose([2,0,1])
@@ -201,7 +201,7 @@ def time_risk_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:
     f_dist = pdf_uni(time, risk, shape_T, dist_T)
     # Shape parameter is irrelevant
     F_exp = 1 - survival_uni(time, scale_C, scale_C, 'exponential')
-    f_lam = lognorm(s=1,loc=0,scale=l2_beta).pdf(risk)
+    f_lam = lognorm(s=np.sqrt(l2_beta),loc=0,scale=1).pdf(risk)
     # Return integral
     f_int = f_dist * F_exp * f_lam
     return f_int
@@ -226,8 +226,12 @@ def integral_for_censoring_multi(scale_C:float, shape_T:float or np.ndarray, dis
     """
     # (i) Determine the upper bound to search over
     alpha = 1/n_points
+    # High time value for censoring distribution
     q_C = quantile_uni(1-alpha, scale_C, 1, 'exponential').max() # Set shape to unity
-    q_T = lognorm(s=1, loc=0, scale=l2_beta).ppf(alpha)
+    # Low value for risk
+    risk_T = lognorm(s=np.sqrt(l2_beta), loc=0, scale=1).ppf(alpha)
+    # Median time value for low-likelihood risk
+    q_T = quantile_uni(0.5, risk_T, shape_T, dist_T).max()
     q_upper = upper_constant*max(q_C, q_T)
     
     # (ii) Generate a log-linear the sequence to search over 
@@ -246,7 +250,7 @@ def err2_censoring_exponential_multi(scale_C:float, censoring:float, shape_T:flo
     return err
 
 
-def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, dist_T:list or str, l2_beta:float or np.ndarray, n_points:int=500, upper_constant:float=20) -> np.ndarray:
+def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, dist_T:list or str, l2_beta:float or np.ndarray, n_points:int=500, upper_constant:float=20, fun_tol:float=1e-3) -> np.ndarray:
     """
     Finds the scale parameter for an exponential distribution to achieve the target censoring for a given target distribution
 
@@ -259,7 +263,7 @@ def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, 
     1xk vector of scale parameters for censoring exponential distribution
     """
     # (i) Input chekcs
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
     dist_T = str2lst(dist_T)
     shape_T = t_wide(shape_T)
     l2_beta = t_wide(l2_beta)
@@ -268,8 +272,16 @@ def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, 
     # (ii) Use the quantiles from each distribution
     scale_C = np.zeros(shape_T.shape)
     for i in range(scale_C.shape[1]):
-        opt = minimize_scalar(fun=err2_censoring_exponential_multi, bracket=(1,2),args=(censoring, float(shape_T[:,i]), dist_T[i], float(l2_beta[:,i]), n_points, upper_constant),method='brent')
-        assert opt.success, 'Brent minimization was not successful'
+        # Extract parameters into floats/strings
+        shape_T_j = float(shape_T[:,i])
+        dist_T_j = dist_T[i]
+        l2_beta_j = float(l2_beta[:,i])
+        # Ensure bounded has a reasonable bracket
+        ub_T = upper_constant * quantile_uni(p=1-1/n_points, scale=lognorm(s=np.sqrt(l2_beta_j),scale=1).median(), shape=shape_T_j, dist=dist_T).max()
+        opt = minimize_scalar(fun=err2_censoring_exponential_multi, bounds=(0,ub_T), args=(censoring, shape_T_j, dist_T_j, l2_beta_j, n_points, upper_constant),method='bounded')
+        # breakpoint()
+        assert opt.fun < fun_tol, f'Minimization function > {fun_tol}: {opt.fun}'
+        assert opt.success, 'Minimization was not successful'
         scale_C[:,i] = opt.x
     return scale_C
 
@@ -321,7 +333,7 @@ def rvs_T_multi(n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str
     return T_act
 
 
-def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list or str, seed:None or int=None) -> np.ndarray:
+def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, dist:list, has_int:bool, seed:None or int=None, n_points:int=500, upper_constant:float=20) -> np.ndarray:
     """
     Generate n_sim samples from each distribution with censoring
 
@@ -336,7 +348,7 @@ def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, d
     (n_sim x k, n_sim x k) np.ndarray's of observed time-to-event measurements and censoring indicators (0==censored)
     """
     # Input checks
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
 
     # Calculate the "actual" time-to-event
     T_act = rvs_T_multi(n_sim, alpha_beta, x, dist, seed)
@@ -345,10 +357,15 @@ def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, d
         return T_act, D_cens
 
     # Determine the "scale" from an exponential needed to obtain censoring
-    scale_C = find_exp_scale_censoring_multi()
-    # k = T_act.shape[1]
-    # scale_C = np.random.rand(1, k, 1)
-
+    k = alpha_beta.shape[1]
+    scale_C = np.zeros([1,k])
+    idx_beta = 1 + int(has_int)
+    for j in range(k):
+        dist_j = dist[j]
+        shape_j = alpha_beta[0,j]
+        l2_beta_j = np.sum(alpha_beta[idx_beta:,j]**2)
+        scale_C[:,j] = find_exp_scale_censoring_multi(censoring=censoring, shape_T=shape_j, dist_T=dist_j, l2_beta=l2_beta_j, n_points=n_points, upper_constant=upper_constant)
+    
     # Generate data from exponential distribution
     T_cens = -np.log(np.random.rand(*T_act.shape)) / scale_C
     D_cens = np.where(T_cens <= T_act, 0, 1)

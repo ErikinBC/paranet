@@ -289,13 +289,19 @@ class parametric():
         return q_mat
 
 
-    def rvs(self, censoring:float, n_sim:int, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None)  -> np.ndarray:
+    def rvs(self, censoring:float, n_sim:int, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None, n_points:int=500, upper_constant:float=20) -> tuple[np.ndarray, np.ndarray]:
         """
-        Generate n_sim samples from the covariate distribution.
+        Generate n_sim samples from the covariate conditional distribution.
+
+        Inputs
+        ------
+        censoring:              Value of censoring (can be between [0,1))
+        n_sim:                  Number of simulations draws
 
         Returns
-
+        -------
+        Two (n,k,n_sim) arrays of time measurements and censoring indicators. If x is (n,p) and beta is (p,k) then array size will be (n,k,n_sim) where [i,j,:] is an n_sim length array where i,k corresponds to the i'th covariate row and j'th distribution.
         """
         x_trans, alpha_beta = self._trans_x_alpha_beta(x=x, alpha=alpha, beta=beta)
-        t, d = rvs_multi(censoring=censoring, n_sim=n_sim, alpha_beta=alpha_beta, x=x_trans, dist=self.dist, seed=seed)
+        t, d = rvs_multi(censoring=censoring, n_sim=n_sim, alpha_beta=alpha_beta, x=x_trans, dist=self.dist, seed=seed, n_points=n_points, upper_constant=upper_constant, has_int=self.add_int)
         return t, d

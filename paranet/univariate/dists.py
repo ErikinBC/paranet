@@ -159,7 +159,7 @@ def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.nda
     1xk vector of scale parameters for censoring exponential distribution
     """
     # (i) Input chekcs
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
     check_dist_str(dist_T)
     # (ii) Use the quantiles from each distribution
     scale_C = np.zeros(scale_T.shape)
@@ -221,7 +221,7 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     2*(n_sim x k) np.ndarray's of observed time-to-event measurements and censoring indicator
     """
     # Input checks
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
     scale, shape = t_wide(scale), t_wide(shape)
     k = scale.shape[1]
     assert scale.shape == shape.shape, 'scale and shape need to be the same'
