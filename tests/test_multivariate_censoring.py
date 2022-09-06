@@ -5,8 +5,8 @@ Check that the multivariate censoring approach works when the covariates come fr
 # External modules
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, lognorm
-from scipy.integrate import quad, dblquad, simpson
+from scipy.stats import norm
+from scipy.integrate import quad, simpson
 # Internal modules
 from paranet.models import parametric
 from paranet.multivariate.dists import integral_for_censoring_multi
@@ -15,7 +15,7 @@ from paranet.univariate.dists import integral_for_censoring, quantile, univariat
 # Limits of integration
 a, b = 0, 10
 # Distribution parameters
-scale_C = 2
+scale_C = 0.1
 scale_T, shape_T = 1, 1
 dist_T = 'weibull'
 # Simulation parameters
@@ -53,12 +53,11 @@ int_multi_emp = np.mean(t_multi_dist > t_cens)
 n_points = 500
 b1 = quantile(1-1/n_points, scale_C, 1, 'exponential').max()
 b2 = quantile(1-1/n_points, scale_T, shape_T, dist_T).max()
-b_upper = 3*max(b1, b2)
-t_seq = np.exp(np.linspace(np.log(1e-10), np.log(b_upper), n_points))
-r_seq = t_seq.copy()#lognorm(s=1,loc=0,scale=l2_beta).ppf(percentile)
+b_upper = 20*max(b1, b2)
+tr_seq = np.exp(np.linspace(np.log(1e-10), np.log(b_upper), n_points))
 
-f_stack = np.hstack([integral_for_censoring_multi(t_seq, r, scale_C, shape_T, dist_T, l2_beta) for r in r_seq])
-int_multi_theory = simpson([simpson(f_stack_t,r_seq) for f_stack_t in f_stack],r_seq)
+f_stack = np.hstack([integral_for_censoring_multi(tr_seq, r, scale_C, shape_T, dist_T, l2_beta) for r in tr_seq])
+int_multi_theory = simpson([simpson(f_stack_t,tr_seq) for f_stack_t in f_stack],tr_seq)
 print(f'Integral for multivariate theory {int_multi_theory:.3f}, empirical {int_multi_emp:.3f}')
 
 
