@@ -54,3 +54,21 @@ print(f'Integral for multivariate theory {int_multi_theory:.3f}, empirical {int_
 scale_C_theory = find_exp_scale_censoring_multi(int_multi_theory, shape_T, dist_T, l2_beta, n_points, constant).flatten()[0]
 print(f'Scale implied by theory {scale_C_theory:.3f}, actual {scale_C:.3f}')
 
+
+# def test_check_censoring(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250, tol:float=1e-2, seed:int=1):
+#     """Make sure that different censoring targets are met"""
+#     # Censoring values to check
+#     censor_seq = np.arange(0, 1, 0.1)
+    
+#     # Generate data
+#     np.random.seed(seed)
+#     k = len(lst_dist)
+#     alpha = np.random.rand(1,k) + 0.5
+#     beta = np.random.rand(p+1,k) + 0.5
+#     x = np.random.randn(n, p)
+#     enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
+
+#     # Check different censoring values
+#     for censoring in censor_seq:
+#         print(f'- Checking for censoring of {censoring} -')
+#         # _, d = enc_dist.rvs(censoring=censoring, n_sim=n_sim, seed=seed)
