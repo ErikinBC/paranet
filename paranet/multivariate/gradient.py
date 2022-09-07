@@ -168,10 +168,9 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, has_i
     bnds_p = tuple([(None, None) for j in range(p)])
     
     # Initialize vector with shape/scale from the univariate instance
-    alpha_beta = np.zeros([p+1, k])
-    init_intercept = np.ones([2, k])
-    x0_intercept = wrapper_grad_solver(t, d, dist, init_intercept)
+    x0_intercept = wrapper_grad_solver(t, d, dist)
     # Set shape
+    alpha_beta = np.zeros([p+1, k])
     alpha_beta[0] = x0_intercept[0]
     # Set intercept scale
     if has_int:
