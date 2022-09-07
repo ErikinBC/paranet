@@ -3,6 +3,7 @@ Creates distribution/gradient specific functions for the multivariate parametric
 """
 
 # External modules
+import warnings
 import numpy as np
 from scipy.stats import lognorm
 from scipy.integrate import simpson
@@ -14,6 +15,8 @@ from paranet.univariate.dists import survival as survival_uni
 from paranet.univariate.dists import quantile as quantile_uni
 from paranet.utils import broadcast_dist, broadcast_long, dist2idx, check_interval, str2lst, t_long, t_wide, try_squeeze
 
+# Supress warning about overflow
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def check_multi_input(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, dist:list) -> None:
     """Check that inputs align to dimensional expectations"""
@@ -180,7 +183,7 @@ def quantile_multi(percentile:np.ndarray, alpha_beta:np.ndarray, x:np.ndarray, d
     return q_mat
 
 
-def time_risk_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:float, shape_T:float or np.ndarray, dist_T:str, l2_beta:float) -> float:
+def time_risk_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:float, shape_T:float or np.ndarray, dist_T:str, l2_beta:float, b0:float) -> float:
     """
     Calculate the function value to be integrated by integral_for_censoring_multi()
 
@@ -192,6 +195,7 @@ def time_risk_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:
     shape_T:            Shape param for the target distribution
     dist_T:             Target distribution name
     l2_beta:            L2 of the risk coefficients
+    b0:                 Intercept for the risk coefficients
     
     Returns
     -------
@@ -201,13 +205,15 @@ def time_risk_multi(time:float or np.ndarray, risk:float or np.ndarray, scale_C:
     f_dist = pdf_uni(time, risk, shape_T, dist_T)
     # Shape parameter is irrelevant
     F_exp = 1 - survival_uni(time, scale_C, scale_C, 'exponential')
-    f_lam = lognorm(s=np.sqrt(l2_beta),loc=0,scale=1).pdf(risk)
+    se_lognorm = np.sqrt(l2_beta)
+    mu_lognorm = np.exp(b0)
+    f_lam = lognorm(s=se_lognorm, scale=mu_lognorm).pdf(risk)
     # Return integral
     f_int = f_dist * F_exp * f_lam
     return f_int
 
 
-def integral_for_censoring_multi(scale_C:float, shape_T:float or np.ndarray, dist_T:str, l2_beta:float, n_points:int=500, upper_constant:float=20) -> float:
+def integral_for_censoring_multi(scale_C:float, shape_T:float or np.ndarray, dist_T:str, l2_beta:float, b0:float, n_points:int=500, upper_constant:float=20) -> float:
     """
     Returns the integral for int_0^infty int_0^infty F_C(time) f_{risk}(time;shape) f_{lambda}(risk); 0; l2) du di
 
@@ -229,7 +235,9 @@ def integral_for_censoring_multi(scale_C:float, shape_T:float or np.ndarray, dis
     # High time value for censoring distribution
     q_C = quantile_uni(1-alpha, scale_C, 1, 'exponential').max() # Set shape to unity
     # Low value for risk
-    risk_T = lognorm(s=np.sqrt(l2_beta), loc=0, scale=1).ppf(alpha)
+    se_lognorm = np.sqrt(l2_beta)
+    mu_lognorm = np.exp(b0)
+    risk_T = lognorm(s=se_lognorm, scale=mu_lognorm).ppf(alpha)
     # Median time value for low-likelihood risk
     q_T = quantile_uni(0.5, risk_T, shape_T, dist_T).max()
     q_upper = upper_constant*max(q_C, q_T)
@@ -238,19 +246,20 @@ def integral_for_censoring_multi(scale_C:float, shape_T:float or np.ndarray, dis
     tr_seq = np.exp(np.linspace(np.log(alpha), np.log(q_upper), n_points))
 
     # (iii) Get function evaluation and integral
-    f_stack = np.hstack([time_risk_multi(tr_seq, r, scale_C, shape_T, dist_T, l2_beta) for r in tr_seq])
+    f_stack = np.hstack([time_risk_multi(tr_seq, r, scale_C, shape_T, dist_T, l2_beta, b0) for r in tr_seq])
+    f_stack = np.where(np.isnan(f_stack), 0, f_stack)
     integral = simpson([simpson(f_stack_t,tr_seq) for f_stack_t in f_stack],tr_seq)
     return integral
 
 
-def err2_censoring_exponential_multi(scale_C:float, censoring:float, shape_T:float, dist_T:str, l2_beta:float, n_points:int=500, upper_constant:float=20) -> float:
+def err2_censoring_exponential_multi(scale_C:float, censoring:float, shape_T:float, dist_T:str, l2_beta:float, b0:float, n_points:int=500, upper_constant:float=20) -> float:
     """Calculates squared error between target censoring and expected value"""
-    expected_censoring = integral_for_censoring_multi(scale_C, shape_T, dist_T, l2_beta, n_points, upper_constant)
+    expected_censoring = integral_for_censoring_multi(scale_C, shape_T, dist_T, l2_beta, b0, n_points, upper_constant)
     err = np.sum((censoring - expected_censoring)**2)
     return err
 
 
-def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, dist_T:list or str, l2_beta:float or np.ndarray, n_points:int=500, upper_constant:float=20, fun_tol:float=1e-3) -> np.ndarray:
+def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, dist_T:list or str, l2_beta:float or np.ndarray, b0:float or np.ndarray, n_points:int=500, upper_constant:float=20, fun_tol:float=1e-3) -> np.ndarray:
     """
     Finds the scale parameter for an exponential distribution to achieve the target censoring for a given target distribution
 
@@ -265,8 +274,7 @@ def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, 
     # (i) Input chekcs
     check_interval(censoring, 0, 1, equals_low=True)
     dist_T = str2lst(dist_T)
-    shape_T = t_wide(shape_T)
-    l2_beta = t_wide(l2_beta)
+    shape_T, l2_beta, b0 = t_wide(shape_T), t_wide(l2_beta), t_wide(b0)
     assert shape_T.shape[1] == l2_beta.shape[1] == len(dist_T), 'expected k to align for input arguments'
 
     # (ii) Use the quantiles from each distribution
@@ -276,10 +284,10 @@ def find_exp_scale_censoring_multi(censoring:float, shape_T:np.ndarray or None, 
         shape_T_j = float(shape_T[:,i])
         dist_T_j = dist_T[i]
         l2_beta_j = float(l2_beta[:,i])
+        b0_j = float(b0[:,i])
         # Ensure bounded has a reasonable bracket
         ub_T = upper_constant * quantile_uni(p=1-1/n_points, scale=lognorm(s=np.sqrt(l2_beta_j),scale=1).median(), shape=shape_T_j, dist=dist_T).max()
-        opt = minimize_scalar(fun=err2_censoring_exponential_multi, bounds=(0,ub_T), args=(censoring, shape_T_j, dist_T_j, l2_beta_j, n_points, upper_constant),method='bounded')
-        # breakpoint()
+        opt = minimize_scalar(fun=err2_censoring_exponential_multi, bounds=(0,ub_T), args=(censoring, shape_T_j, dist_T_j, l2_beta_j, b0_j, n_points, upper_constant),method='bounded')
         assert opt.fun < fun_tol, f'Minimization function > {fun_tol}: {opt.fun}'
         assert opt.success, 'Minimization was not successful'
         scale_C[:,i] = opt.x
@@ -362,9 +370,12 @@ def rvs_multi(censoring:float, n_sim:int, alpha_beta:np.ndarray, x:np.ndarray, d
     idx_beta = 1 + int(has_int)
     for j in range(k):
         dist_j = dist[j]
-        shape_j = alpha_beta[0,j]
+        shape_j = float(alpha_beta[0,j])
         l2_beta_j = np.sum(alpha_beta[idx_beta:,j]**2)
-        scale_C[:,j] = find_exp_scale_censoring_multi(censoring=censoring, shape_T=shape_j, dist_T=dist_j, l2_beta=l2_beta_j, n_points=n_points, upper_constant=upper_constant)
+        b0_j = 0
+        if has_int:
+            b0_j = float(alpha_beta[1,j])
+        scale_C[:,j] = find_exp_scale_censoring_multi(censoring=censoring, shape_T=shape_j, dist_T=dist_j, l2_beta=l2_beta_j, b0=b0_j, n_points=n_points, upper_constant=upper_constant)
     
     # Generate data from exponential distribution
     T_cens = -np.log(np.random.rand(*T_act.shape)) / scale_C
