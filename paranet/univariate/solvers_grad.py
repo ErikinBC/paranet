@@ -87,6 +87,8 @@ def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or
         assert x0.shape == (p, k), 'x0 needs to be a (p,k) matrix'
     # Flatten
     x0 = x0.T.flatten()
+    # Define the bounds (scale/shape must be positive)
+    bnds = tuple([(0, None) for j in range(len(x0))])
     # Check the log-likelihood
     try:
         log_lik_vec(x0, t, d, dist)
@@ -98,7 +100,7 @@ def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or
     except:
         print('log_lik_vec failed')
     # Run the optimizer
-    opt = minimize(fun=log_lik_vec, x0=x0, method='L-BFGS-B', jac=grad_ll_vec, args=(t, d, dist))
+    opt = minimize(fun=log_lik_vec, x0=x0, method='L-BFGS-B', jac=grad_ll_vec, args=(t, d, dist), bounds=bnds)
     # Check for convergence
     assert opt.success, f'Optimization did not converge: {opt.message}'
     # Return in (p,k) format

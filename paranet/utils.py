@@ -237,7 +237,7 @@ def format_t_d(t:np.ndarray, d:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
     """
     t_vec, d_vec = t_long(t), t_long(d)
-    assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be teh same size'
+    assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be the same size'
     return t_vec, d_vec
 
 
