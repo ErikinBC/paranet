@@ -14,23 +14,19 @@ sprintf('Sum y=%.1f, sum x_trans^2=%.1f',sum(y),sum(x_trans**2))
 
 # (ii) Fit unregularized model
 mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=1, lambda=0,standardize=FALSE)
-round(c(mdl$a0,mdl$beta[,'s0']),3)
+bhat_unreg = c(mdl$a0,mdl$beta[,'s0'])
 
 # (iii) Fit L2-only model
 mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=0, lambda=1,standardize=FALSE)
-round(c(mdl$a0,mdl$beta[,'s0']),3)
+bhat_l2 = c(mdl$a0,mdl$beta[,'s0'])
 
 # (iii) Fit L1-only model
-mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=1, lambda=0,standardize=FALSE)
-round(c(mdl$a0,mdl$beta[,'s0']),3)
+mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=1, lambda=0.1,standardize=FALSE)
+bhat_l1 = c(mdl$a0,mdl$beta[,'s0'])
 
-# Fit elastic net model for specific hyperparameter
-mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=0.5, lambda=c(0.1),standardize=FALSE)
-abhat = c(as.numeric(mdl$a0),as.vector(mdl$beta))
-cn = c('intercept',row.names(mdl$beta))
-df = data.frame(cn=cn, val=abhat)
-print(df)
-# Coefficient values to be parsed in python
-paste(as.character(round(df$val,5)),collapse=', ')
+# (iv) Fit the elastic net model
+mdl = glmnet(x=x_trans,y=y,family='binomial',alpha=0.5, lambda=0.25,standardize=FALSE)
+bhat_elnet = c(mdl$a0,mdl$beta[,'s0'])
 
-glm(y ~ x_trans, family=binomial)$coef
+df = data.frame(unreg=bhat_unreg, l2=bhat_l2, l1=bhat_l1, elnet=bhat_elnet)
+df
