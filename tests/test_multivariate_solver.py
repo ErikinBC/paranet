@@ -52,7 +52,9 @@ def test_param_consistency(n:int=1000000, p:int=5, lst_dist:list=dist_valid, n_s
 
 
 if __name__ == '__main__':
-    # Check that with large enough sample size we can arbitraily close to expected solution
+    # (ii) Check that l2 regularization can solve p > n problems...
+    
+    # (i) Check that with large enough sample size we can arbitraily close to expected solution
     n, p, n_sim = 1000000, 5, 10
     tol_bhat, tol_moment = 0.02, 0.03
     test_param_consistency(n, p, dist_valid, n_sim, tol_bhat, tol_moment)

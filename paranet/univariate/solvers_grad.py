@@ -2,7 +2,6 @@
 WRAPPER TO PERFORM GRADIENT OPTIMIZATION
 """
 
-# https://docs.scipy.org/doc/scipy/tutorial/optimize.html#trust-region-nearly-exact-algorithm-method-trust-exact
 # https://hastie.su.domains/Papers/glmnet.pdf
 # https://www.cs.cmu.edu/~ggordon/10725-F12/slides/25-coord-desc.pdf
 # https://github.com/pmelchior/proxmin
