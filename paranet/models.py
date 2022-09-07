@@ -6,6 +6,7 @@ Contains the main
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler
 # Internal modules
+from paranet.multivariate.gradient import nll_solver
 from paranet.multivariate.multi_utils import args_alpha_beta, has_args_init
 from paranet.multivariate.dists import hazard_multi, survival_multi, pdf_multi, quantile_multi, rvs_multi
 from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx
@@ -221,7 +222,6 @@ class parametric():
         return x_trans, alpha_beta
 
 
-
     def _trans_t_x_alpha_beta(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Internal method to process data to be passed in the hazard, survival, and pdf functions
@@ -237,6 +237,37 @@ class parametric():
         alpha_beta = args_alpha_beta(k, p, alpha, beta, self.alpha, self.beta)
         return t_trans, x_trans, alpha_beta
 
+    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, grad_tol:float=1e-3, n_perm:int=10) -> None:
+        """
+        Defines a fitting procedure to learn alpha_beta which can then be used as an inhereted attribute in methods like hazard(), rvs(), or predict()
+        
+        Inputs
+        ------
+        x:              A (n,p) array of covariates (if None, assumes x was assigned during initialization)
+        t:              A (n,k) array of time values (if None, assumes t was assigned during initialization)
+        d:              A (n,k) array of censoring values (if None, assumes d was assigned during initialization)
+        grad_tol:           Post-convergence checks for largest gradient size allowable
+        n_perm:             Number of random pertubations to do around "optimal" coefficient vector to check that lower log-likelihood is not possible
+
+        Returns
+        -------
+        The (p+1,k) shape/scale covariate matrix as self.alpha_beta
+        """
+        # Process inputs
+        t_trans, x_trans = self._process_t_x(t, x)
+        k = t_trans.shape[1]
+        d_trans = broadcast_long(d, k)
+        # Input checks
+        assert t_trans.shape == d_trans.shape, 't_trans and d_trans need to be the same shape'
+        assert k == len(self.dist), 'number of columns of t_trans needs to align with self.dist'
+        # Run solver and assign to attributes
+        alpha_beta = nll_solver(x_trans, t_trans, d_trans, self.dist, self.add_int, grad_tol, n_perm)
+        self.alpha = alpha_beta[[0]]
+        self.beta = alpha_beta[1:]
+        # output checks
+        assert self.beta.shape[0] == x_trans.shape[1], 'Number of rows of beta should align with the number of columns of (transformed) x'
+        assert k == self.beta.shape[1], 'Number of columns of beta should be the same as k'
+
 
     def hazard(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
         """
@@ -249,7 +280,7 @@ class parametric():
         alpha:          A (k,1) array of shape values
         beta:           A (p,k) array of scale parameters
 
-        Outputs
+        Returns
         -------
         Returns an (n,k) matrix of hazards
         """

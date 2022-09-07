@@ -10,7 +10,7 @@ from paranet.utils import dist_valid
 from paranet.models import parametric
 
 
-def test_check_censoring(n:int=250000, p:int=5, n_sim:int=1, lst_dist:list=dist_valid, n_points:int=250, upper_constant:float=40, tol:float=0.01, seed:int=1) -> None:
+def test_check_censoring(n:int=250000, p:int=5, n_sim:int=1, lst_dist:list=dist_valid, n_points:int=750, upper_constant:float=40, tol:float=0.01, seed:int=1) -> None:
     """
     Make sure that different censoring targets are met
     

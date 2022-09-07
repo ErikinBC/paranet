@@ -12,6 +12,13 @@ from typing import Callable
 dist_valid = ['exponential', 'weibull', 'gompertz']
 
 
+# Set up the bounds for the different distributions (shape param is redundant for exponential)
+di_bounds = {'exponential':((0, None), (0, None)),
+             'weibull':((0, None), (0, None)),
+             'gompertz':((None, None), (0, None))}
+
+
+
 def try_squeeze(x:np.ndarray, axis:int or None=None) -> np.ndarray:
     """Implements np.sqeeze but will not squeeze axis if length > 1"""
     if axis is not None:
@@ -21,7 +28,6 @@ def try_squeeze(x:np.ndarray, axis:int or None=None) -> np.ndarray:
             return x
     else:
         return np.squeeze(x, axis)
-
 
 
 def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:

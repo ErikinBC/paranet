@@ -10,6 +10,7 @@ Classes to support parametric survival probability distributions
 # https://square.github.io/pysurvival/models/parametric.html
 
 # External modules
+import warnings
 import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
@@ -17,6 +18,8 @@ from scipy.optimize import minimize_scalar
 # Internal modules
 from paranet.utils import broadcast_long, param2array, len_of_none, str2lst, t_long, t_wide, check_dist_str, check_interval, dist2vec, dist2idx, broadcast_dist
 
+# Supress warning about overflow
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:list or str) -> np.ndarray:
     """

@@ -7,7 +7,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 # Internal modules
-from paranet.utils import dist2idx, broadcast_long, broadcast_dist, t_long
+from paranet.utils import di_bounds, dist2idx, broadcast_long, broadcast_dist, t_long
 from paranet.multivariate.dists import check_multi_input
 from paranet.univariate.solvers_grad import wrapper_grad_solver
 
@@ -165,7 +165,7 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, has_i
         assert np.all(x[:,0] == 1), 'If has_int==True, expected x[:,0] to be all ones!'
 
     # Set up optimization bounds
-    bnds = tuple([(0, None)] + [(None, None) for j in range(p)])
+    bnds_p = tuple([(None, None) for j in range(p)])
     
     # Initialize vector with shape/scale from the univariate instance
     alpha_beta = np.zeros([p+1, k])
@@ -183,7 +183,8 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, has_i
         x0_i = alpha_beta[:,[i]]  # Needs to be a column vector
         dist_i = [dist[i]]
         t_i, d_i = t[:,i], d[:,i]
-        opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i), method='L-BFGS-B', bounds=bnds)
+        bnds_i = (di_bounds[dist[i]][0],) + bnds_p
+        opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i), method='L-BFGS-B', bounds=bnds_i)
         # Check for convergence
         assert opt_i.success, f'Optimization was unsuccesful for {i}'
         grad_max_i = np.abs(opt_i.jac.flat).max()
@@ -199,14 +200,4 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, has_i
     return alpha_beta
 
 
-from paranet.utils import dist_valid
-n, p, k = 100, 5, 3
-# 7
-np.random.seed(7)
-alpha_beta = np.random.rand(p+1,k)
-x = np.random.randn(n,p)
-t = np.random.exponential(1,[n,k])
-d = np.random.binomial(1,0.5,[n,k])
-ix = np.c_[np.ones(len(x)), x]
-nll_solver(ix, t, d, dist_valid, True)    
 

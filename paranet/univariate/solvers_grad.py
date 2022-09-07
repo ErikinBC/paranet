@@ -15,7 +15,8 @@ from scipy.optimize import minimize
 
 # Internal modules
 from paranet.univariate.gradient import grad_ll, log_lik
-from paranet.utils import is_vector, shape_scale_2vec, _get_p_k, broadcast_td_dist, t_long
+from paranet.utils import di_bounds, is_vector, shape_scale_2vec, _get_p_k, broadcast_td_dist, t_long
+
 
 def log_lik_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str or list) -> float:
     """
@@ -70,41 +71,35 @@ def grad_ll_vec(shape_scale:np.ndarray, t:np.ndarray, d:np.ndarray, dist:str) ->
     return grad_vec
 
 
-def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or np.ndarray=None):
+def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or np.ndarray=None) -> np.ndarray:
     """
-    CARRIES OUT OPTIMIZATION FOR GRADIENT-BASED METHOD
+    Carries out gradient-based optimization for univariate parameteric survival distributions
+
+    Returns
+    -------
+    A (2,k) matrix of shape (first row) and scale (second row) parameters
     """
     # Input transforms
     t, d = t_long(t), t_long(d)
     t, d, dist = broadcast_td_dist(t, d, dist)
-    # Currently we support two rows (p=# of scale + 1 for shape)
-    p = 2
-    k = t.shape[1]
-    # Initialize parameters
-    if x0 is None:
-        x0 = np.zeros([p,k]) + 1
-    else:
-        assert x0.shape == (p, k), 'x0 needs to be a (p,k) matrix'
-    # Flatten
-    x0 = x0.T.flatten()
+    # Univariate optimization has two rows (p=# of scale + 1 for shape)
+    p, k  = 2, t.shape[1]
+    if x0 is None:  # Initialize parameters if not specified
+        x0 = np.ones([p,k])
+    assert x0.shape == (p, k), 'x0 needs to be a (p,k) matrix'
     # Define the bounds (scale/shape must be positive)
-    bnds = tuple([(0, None) for j in range(len(x0))])
-    # Check the log-likelihood
-    try:
-        log_lik_vec(x0, t, d, dist)
-    except:
-        print('log_lik_vec failed')
-    # Check the gradient call
-    try:
-        grad_ll_vec(x0, t, d, dist)
-    except:
-        print('log_lik_vec failed')
-    # Run the optimizer
-    opt = minimize(fun=log_lik_vec, x0=x0, method='L-BFGS-B', jac=grad_ll_vec, args=(t, d, dist), bounds=bnds)
-    # Check for convergence
-    assert opt.success, f'Optimization did not converge: {opt.message}'
-    # Return in (p,k) format
-    shape_scale = opt.x.reshape([k,p]).T
+    
+    # -- Run the optimizer -- #
+    shape_scale = np.ones(x0.shape)
+    for i in range(k):
+        x0_i, t_i, d_i, dist_i = x0[:,[i]], t[:,[i]], d[:,[i]], [dist[i]]
+        bnds_i = di_bounds[dist[i]]
+        opt_i = minimize(fun=log_lik_vec, jac=grad_ll_vec, x0=x0_i, method='L-BFGS-B', args=(t_i, d_i, dist_i), bounds=bnds_i)
+        # Check for convergence
+        if not opt_i.success:
+            breakpoint()
+        assert opt_i.success, f'Optimization did not converge: {opt_i.message} for {dist[i]}'
+        shape_scale[:,i] = opt_i.x
     return shape_scale
 
 
