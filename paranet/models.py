@@ -171,6 +171,18 @@ class parametric():
         t = broadcast_long(t, self.k)
         return t
 
+    def _process_d(self, d:np.ndarray or None=None) -> np.ndarray:
+        """For transforming d when inherited"""
+        has_args = has_args_init(d, self.d)
+        if has_args:  # Use user-supplied parameters
+            d = t_long(d)
+        else:
+            d = self.d.copy()
+        assert np.all((d == 1) | (d == 0)), 'Expected all values of d to be in {0,1}'
+        # (possibly) scale time measurements
+        d = broadcast_long(d, self.k)
+        return d
+
 
     def _process_x(self, x:np.ndarray or None=None) -> np.ndarray:
         """See _proccess_t_x"""
@@ -255,18 +267,18 @@ class parametric():
         """
         # Process inputs
         t_trans, x_trans = self._process_t_x(t, x)
-        k = t_trans.shape[1]
-        d_trans = broadcast_long(d, k)
+        d_trans = self._process_d(d)
+        k_t = t_trans.shape[1]
         # Input checks
         assert t_trans.shape == d_trans.shape, 't_trans and d_trans need to be the same shape'
-        assert k == len(self.dist), 'number of columns of t_trans needs to align with self.dist'
+        assert k_t == len(self.dist), 'number of columns of t_trans needs to align with self.dist'
         # Run solver and assign to attributes
         alpha_beta = nll_solver(x_trans, t_trans, d_trans, self.dist, self.add_int, grad_tol, n_perm)
         self.alpha = alpha_beta[[0]]
         self.beta = alpha_beta[1:]
         # output checks
         assert self.beta.shape[0] == x_trans.shape[1], 'Number of rows of beta should align with the number of columns of (transformed) x'
-        assert k == self.beta.shape[1], 'Number of columns of beta should be the same as k'
+        assert k_t == self.beta.shape[1], 'Number of columns of beta should be the same as k'
 
 
     def hazard(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
