@@ -4,81 +4,90 @@ Check that scaling the time and covariates does not affect inference. Although t
 
 # External modules
 import numpy as np
-import pandas as pd
 from scipy import stats
 
 # Internal modules
 from paranet.utils import dist_valid, t_long
 from paranet.models import parametric
 
-def test_scale_x():
-    1
 
-n, p = 250000, 5
-tol_pct = 0.05
-tol_dpct = 0.01
-# Generate some exponential data
-mu_X = np.linspace(-10, 10, p)
-se_X = np.linspace(1, 10, p)
-x_raw = stats.norm(loc=mu_X, scale=se_X).rvs([n,p], random_state=n)
-b_raw = stats.norm(loc=0,scale=1/se_X**2).rvs(p) #np.atleast_2d().T
-b0_raw = -np.sum(b_raw * mu_X) - 1
-eta_raw = b0_raw + x_raw.dot(b_raw)
-risk_raw = np.exp(eta_raw)
-np.random.seed(n)
-t_raw = np.random.exponential(scale=1/risk_raw, size=n)
-d_raw = np.ones(n)
+def test_scale_x(n:int=250000, p:int=5, lst_dist:list=dist_valid, tol_pct:float=0.05, tol_method:float=0.085):
+    # Set up the covariates
+    mu_X = np.linspace(-10, 10, p)
+    se_X = np.linspace(1, 10, p)
+    x_raw = stats.norm(loc=mu_X, scale=se_X).rvs([n,p], random_state=n)
+    alpha_raw = 0.5
+    b_raw = stats.norm(loc=0,scale=1/se_X**2).rvs(p, random_state=n)
+    b0_raw = -np.sum(b_raw * mu_X) - 1
+    beta_raw = t_long(np.append([b0_raw],b_raw))
+    abeta_raw = np.append([alpha_raw],beta_raw)
 
+    # Quantile to evaluate
+    pseq = [0.25, 0.5, 0.75]
+    # Methods to evaluate
+    methods = ['survival', 'hazard', 'pdf']
 
-# (i) oracle model
-beta_raw = t_long(np.append([b0_raw],b_raw))
-enc_oracle = parametric('exponential', alpha=1, beta=beta_raw, scale_x=False, scale_t=False, add_int=True)
+    for dist in lst_dist:
+        print(f'-- Running for {dist} --')
+        # (i) oracle model
+        enc_oracle = parametric(dist, x_raw, alpha=alpha_raw, beta=beta_raw, scale_x=False, scale_t=False, add_int=True)
+        t_raw, d_raw = enc_oracle.rvs(0, 1, seed=n)
+        t_raw, d_raw = np.squeeze(t_raw), np.squeeze(d_raw)
 
-# (ii) unscaled version
-enc_unscaled = parametric('exponential', x_raw, t_raw, d_raw, scale_x=False, scale_t=False, add_int=True)
-enc_unscaled.fit()
-err_unscaled = np.abs(enc_unscaled.beta/beta_raw-1).max() 
-assert err_unscaled < tol_pct, f'Unscaled coefficients should be within {tol_pct}: {err_unscaled:.4f}'
+        # (ii) unscaled version
+        enc_unscaled = parametric(dist, x_raw, t_raw, d_raw, scale_x=False, scale_t=False, add_int=True)
+        enc_unscaled.fit()
+        if dist == 'exponential':
+            enc_unscaled.alpha = enc_oracle.alpha
+        abeta_unscaled = np.append(enc_unscaled.alpha, enc_unscaled.beta)
+        err_unscaled = np.abs(abeta_unscaled/abeta_raw-1).max() 
+        assert err_unscaled < tol_pct, f'Unscaled coefficients should be within {tol_pct}: {err_unscaled:.4f}'
 
-# (iii) scaled_x version
-enc_scale_x = parametric('exponential', x_raw, t_raw, d_raw, scale_x=True, scale_t=False, add_int=True)
-enc_scale_x.fit()
-# "Recover" original coefficients by divided transformed model by scaling factor
-b_trans_x = enc_scale_x.beta[1:].flat / enc_scale_x.enc_x.scale_
-err_scale_x = np.abs(b_trans_x/b_raw-1).max()
-assert err_scale_x < tol_pct, f'Scaled coefficients divided by standard error should be within {tol_pct}: {err_scale_x:.4f}'
-# Recover original intercept by substracting off sum_j b_j * mu_j / se_j from the scaled intercept
-b0_trans_x = enc_scale_x.beta[0][0]-np.sum(enc_scale_x.beta[1:].flat*enc_scale_x.enc_x.mean_/enc_scale_x.enc_x.scale_)
-err_int_x = np.abs(b0_trans_x/b0_raw-1)
-assert err_int_x < tol_pct, f'Reconstructed intercept should be within {tol_pct}: {err_int_x:.4f}'
+        # (iii) scaled_x version
+        enc_scale_x = parametric(dist, x_raw, t_raw, d_raw, scale_x=True, scale_t=False, add_int=True)
+        enc_scale_x.fit()
+        if dist == 'exponential':
+            enc_scale_x.alpha = enc_oracle.alpha
+        # Recover original intercept by substracting off sum_j b_j * mu_j / se_j from the scaled intercept
+        b0_trans_x = enc_scale_x.beta[0][0]-np.sum(enc_scale_x.beta[1:].flat*enc_scale_x.enc_x.mean_/enc_scale_x.enc_x.scale_)
+        # "Recover" original coefficients by divided transformed model by scaling factor
+        b_trans_x = enc_scale_x.beta[1:].flat / enc_scale_x.enc_x.scale_
+        abeta_trans_x = np.append(np.append(enc_scale_x.alpha,[b0_trans_x]),b_trans_x)
+        err_scale_x = np.abs(abeta_trans_x/abeta_raw-1).max()
+        assert err_scale_x < tol_pct, f'Scaled coefficients divided by standard error should be within {tol_pct}: {err_scale_x:.4f}'
 
+        # (iv) Scale t (and x) only
+        for scale_x in [False, True]:
+            enc_scale_t = parametric(dist, x_raw, t_raw, d_raw, scale_x=scale_x, scale_t=True, add_int=True)
+            enc_scale_t.fit()
+            if dist == 'exponential':
+                enc_scale_t.alpha = enc_oracle.alpha
+            # (a) Check that the three methods are the same
+            for method in methods:
+                method_oracle = getattr(enc_oracle, method)(t_raw, x_raw).flatten()
+                method_scale_t = getattr(enc_scale_t, method)(t_raw, x_raw).flatten()
+                # Using the 5th-95th percentile, compare results
+                idx_sort = np.argsort(method_oracle)
+                method_oracle, method_scale_t = method_oracle[idx_sort], method_scale_t[idx_sort]
+                method_oracle = method_oracle[int(n*0.1):int(n*0.90)]
+                method_scale_t = method_scale_t[int(n*0.1):int(n*0.90)]
+                err_method_t = np.abs(method_scale_t / method_oracle-1).max()
+                assert err_method_t < tol_method, f'Values for method {method} should be within {tol_method} of the oracle: {err_method_t:.4f}'
+            # (b) Check that the quantile() works   
+            err_quantile_scale_t = np.abs(enc_scale_t.quantile(pseq, x=x_raw) / enc_oracle.quantile(pseq, x=x_raw) - 1).max()
+            assert err_quantile_scale_t < tol_pct, f'Quantile values should be within {tol_pct} of the orcale: {err_quantile_scale_t:.4f}'
+            # (c) Check that rvs() works
+            quant_rvs_oracle = np.quantile(enc_oracle.rvs(0,n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
+            quant_rvs_scale_t = np.quantile(enc_scale_t.rvs(0,n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
+            err_quant_rvs = np.abs(quant_rvs_scale_t / quant_rvs_oracle - 1).max()
+            assert err_quant_rvs < tol_pct, f'Quantile values should be within {tol_pct} of the orcale: {err_quant_rvs:.4f}'
 
-# (iv) Scale t only
-enc_scale_t = parametric('exponential', x_raw, t_raw, d_raw, scale_x=False, scale_t=True, add_int=True)
-enc_scale_t.fit()
-# (i) Check that the survival values are the same
-err_surv_t = np.abs(enc_scale_t.survival(t_raw, x_raw) - enc_oracle.survival(t_raw, x_raw)).max()
-assert err_surv_t < tol_dpct, f'Expected survival functions to produce similar results for scale_t version {tol_dpct}: {err_surv_t:.4f}'
-# (ii) Check that the ratio of pdf/hazards is a constant equal to maximum time scaler
-ratio_pdf = enc_scale_t.pdf(t_raw, x_raw) / enc_oracle.pdf(t_raw, x_raw)
-ratio_haz = enc_scale_t.hazard(t_raw, x_raw) / enc_oracle.hazard(t_raw, x_raw)
-ratio_pdf_haz = np.append(ratio_pdf, ratio_haz)
-err_ratio = np.abs(ratio_pdf_haz.mean() / enc_scale_t.enc_t.max_abs_ - 1).max()
-assert err_ratio < tol_pct, f'Expected ratio of hazards/pdfs to be the same as the scaling constant {tol_pct}: {err_ratio:.4f}'
-# (iii) Check that the quantile function works as expected
-pseq = np.arange(0.1,1,0.1)
-np.squeeze(enc_scale_t.quantile(pseq, x=x_raw[:2])) * enc_scale_t.enc_t.max_abs_
-np.squeeze(enc_oracle.quantile(pseq, x=x_raw[:2]))
-
-
-# (iv) Scale x and t
-# --> check that the hazard/surv/pdf are exactly the same to the unscaled version
-# --> check that the hazard/surv/pdf are close to the oracle
-# --> Check the ppf
 
 
 if __name__ == '__main__':
     # (i) Check covariate scaling
-    test_scale_x()
+    n, p = 250000, 5
+    tol_pct, tol_method = 0.05, 0.085
+    test_scale_x(n, p, dist_valid, tol_pct, tol_method)
 
 

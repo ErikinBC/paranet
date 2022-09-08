@@ -298,6 +298,8 @@ class parametric():
         """
         t_trans, x_trans, alpha_beta = self._trans_t_x_alpha_beta(t=t, x=x, alpha=alpha, beta=beta)
         haz_mat = hazard_multi(alpha_beta, x_trans, t_trans, self.dist)
+        if not_none(self.enc_t):  # Return to original scale
+            haz_mat /= self.enc_t.max_abs_
         return haz_mat
 
     def survival(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
@@ -310,6 +312,8 @@ class parametric():
         """Calculate the density (see hazard)"""
         t_trans, x_trans, alpha_beta = self._trans_t_x_alpha_beta(t=t, x=x, alpha=alpha, beta=beta)
         pdf_mat = pdf_multi(alpha_beta, x_trans, t_trans, self.dist)
+        if not_none(self.enc_t):  # Return to original scale
+            pdf_mat /= self.enc_t.max_abs_
         return pdf_mat
 
 
@@ -329,6 +333,8 @@ class parametric():
         """
         x_trans, alpha_beta = self._trans_x_alpha_beta(x=x, alpha=alpha, beta=beta)
         q_mat = quantile_multi(percentile, alpha_beta, x_trans, self.dist, squeeze)
+        if not_none(self.enc_t):  # Return to original scale
+            q_mat *= self.enc_t.max_abs_
         return q_mat
 
 
@@ -347,4 +353,6 @@ class parametric():
         """
         x_trans, alpha_beta = self._trans_x_alpha_beta(x=x, alpha=alpha, beta=beta)
         t, d = rvs_multi(censoring=censoring, n_sim=n_sim, alpha_beta=alpha_beta, x=x_trans, dist=self.dist, seed=seed, n_points=n_points, upper_constant=upper_constant, has_int=self.add_int)
+        if not_none(self.enc_t):  # Return to original scale
+            t *= self.enc_t.max_abs_
         return t, d
