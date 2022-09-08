@@ -23,3 +23,7 @@ $$
 \eta_i &= x_i^T \beta
 \end{align}
 $$
+
+## (x) Unittests
+
+The execute all unit tests run `python3 -m pytest` from the main folder. Alternatively, groups of tests can be run using the `run_pytest_{group}.sh`.

@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 # Internal modules
-from paranet.dists import surv_dist
-from paranet.gradient import log_lik, grad_ll
+from paranet.univariate.dists import univariate_dist
+from paranet.univariate.gradient import log_lik, grad_ll
 from paranet.utils import dist_valid, vstack_pd
-from paranet.solvers_grad import wrapper_grad_solver
+from paranet.univariate.solvers_grad import wrapper_grad_solver
 
 # Scale and shape parameters shared by functions
 lam = np.array([0.5, 1, 1.5])
@@ -30,7 +30,7 @@ def test_solver(n_sim:int=1000000, tol:float=1e-2, seed:int=1) -> None:
     """
     censoring_seq = [0, 1/4, 1/2]
     for dist in dist_valid:
-        gen_dist = surv_dist(dist, scale=lam, shape=alph)
+        gen_dist = univariate_dist(dist, scale=lam, shape=alph)
         for censoring in censoring_seq:
             print(f'Fitting {dist} model with {censoring:.2f} censoring')
             T_sim, D_sim = gen_dist.rvs(n_sim, censoring, seed=seed)
@@ -55,7 +55,7 @@ def test_finite_differences(n_sim:int=100, seed:int=1, tol:float=1e-4, epsilon:f
     # Generate data
     di_TD_dist = dict.fromkeys(dist_valid)
     for dist in dist_valid:
-        gen_dist = surv_dist(dist, scale=lam, shape=alph)
+        gen_dist = univariate_dist(dist, scale=lam, shape=alph)
         di_TD_dist[dist] = gen_dist.rvs(n_sim=n_sim, seed=seed)
 
     # Perturb parameter vectors for finite differences

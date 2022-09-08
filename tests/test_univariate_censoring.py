@@ -6,7 +6,7 @@ Ensure that rvs(...,censoring=float) works and achieves expected censoring level
 import numpy as np
 
 # Internal modules
-from paranet.dists import surv_dist
+from paranet.univariate.dists import univariate_dist
 from paranet.utils import dist_valid
 
 # Experiment with different shape parameters
@@ -16,7 +16,7 @@ cens_seq = [0.25,0.5,0.75]
 
 def test_cens_precision(tol_cens:float=5e-3, n_sim:int=10000000, seed:int=1):
     for dist in dist_valid:
-        mdl_dist = surv_dist(dist, scale, shape)
+        mdl_dist = univariate_dist(dist, scale, shape)
         for cens in cens_seq:
             print(f'Running censoring sim for {dist} target of {cens}')
             _, d = mdl_dist.rvs(n_sim=n_sim, censoring=cens, seed=seed)
@@ -32,10 +32,10 @@ def cens_plot(n_points:int=500, cens:float=0.5):
         from paranet.utils import gg_save
 
         # Make an example plot of censored vs non-censored    
-        dist_wei_1 = surv_dist('weibull', 1, 1)
+        dist_wei_1 = univariate_dist('weibull', 1, 1)
         t_1_0, d_1_0 = dist_wei_1.rvs(n_points, 0, seed)
         t_1_1, d_1_1 = dist_wei_1.rvs(n_points, cens, seed)
-        dist_wei_2 = surv_dist('weibull', 2, 1)
+        dist_wei_2 = univariate_dist('weibull', 2, 1)
         t_2_0, d_2_0 = dist_wei_2.rvs(n_points, 0, seed)
         t_2_1, d_2_1 = dist_wei_2.rvs(n_points, cens, seed)
         

@@ -3,10 +3,14 @@ GRADIENT METHODS FOR MLL FITTING
 """
 
 # External modules
+import warnings
 import numpy as np
 
 # Internal modules
 from paranet.utils import broadcast_dist, format_t_d_scale_shape, dist2idx
+
+# Supress overflow warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str) -> np.ndarray:
@@ -17,8 +21,8 @@ def log_lik(t:np.ndarray, d:np.ndarray, scale:np.ndarray, shape:np.ndarray or No
     ------
     t:                  A [n,k] or (n,) matrix/array of time-to-event values
     d:                  A [n,k] or (n,) matrix/array of censoring values (1=event, 0=right-censored)
-    scale:              See (SurvDists): equivilent to \lambda
-    shape:              See (SurvDists): equivilent to \alpha
+    scale:              See (SurvDists): equivilent to lambda
+    shape:              See (SurvDists): equivilent to alpha
     dist:               A valid distribution (currently: exponential, weibull, or gompertz)
 
     Returns

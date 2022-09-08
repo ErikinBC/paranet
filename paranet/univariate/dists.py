@@ -10,6 +10,7 @@ Classes to support parametric survival probability distributions
 # https://square.github.io/pysurvival/models/parametric.html
 
 # External modules
+import warnings
 import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar
@@ -17,6 +18,8 @@ from scipy.optimize import minimize_scalar
 # Internal modules
 from paranet.utils import broadcast_long, param2array, len_of_none, str2lst, t_long, t_wide, check_dist_str, check_interval, dist2vec, dist2idx, broadcast_dist
 
+# Supress warning about overflow
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def hazard(t:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:list or str) -> np.ndarray:
     """
@@ -101,19 +104,19 @@ def quantile(p:np.ndarray, scale:np.ndarray, shape:np.ndarray or None, dist:str)
         if d == 'weibull':
             q_mat[:,i] = (nlp[:,i] / scale[:,i]) ** (1/shape[:,i])
         if d == 'gompertz':
-            q_mat[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlp)
+            q_mat[:,i] = 1/shape[:,i] * np.log(1 + shape[:,i]/scale[:,i]*nlp[:,i])
     return q_mat
 
 
-def integral_for_censoring(t:np.ndarray, scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str) -> np.ndarray:
+def integral_for_censoring(t:float or np.ndarray, scale_C:float, scale_T:float, shape_T:float, dist_T:str) -> float:
     f_dist = pdf(t, scale_T, shape_T, dist_T)
     # Note the shape input doesn't matter here
-    S_dist = survival(t, scale_C, scale_C, 'exponential')
-    f_int = f_dist * S_dist
+    F_exp = 1 - survival(t, scale_C, scale_C, 'exponential')
+    f_int = f_dist * F_exp
     return f_int
 
 
-def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, alpha:float=0.001) -> np.ndarray:
+def censoring_exponential(scale_C:float, scale_T:float, shape_T:float, dist_T:str, alpha:float=0.001) -> float:
     """
     Function to calculate the probability that P(C < T), where T is the target distribution of interest (defined by scale/shape), and C is an exponential distribution that will act as the censoring distribution where T_obs = T if T<C, and C if T>C
     
@@ -129,21 +132,14 @@ def censoring_exponential(scale_C:np.ndarray, scale_T:np.ndarray, shape_T:np.nda
     -------
     A 1xk vector of vector of censoring probabilities P(C < T)
     """
-    # Input chekcs
-    scale_C, scale_T, shape_T = t_wide(scale_C), t_wide(scale_T), t_wide(shape_T)
-    assert scale_C.shape == scale_T.shape == shape_T.shape, 'scale and shape need to have same dims'
     # (i) Calculate a reasonable upper-bound to integrate over
     b_upper = 2 * quantile(1-alpha, scale_T, shape_T, dist_T)
-    assert b_upper.shape == scale_C.shape, 'Integral upper bound needs to have same dims'
     # (ii) Loop over the columns
-    censoring = np.zeros(scale_C.shape)
-    for k in range(scale_C.shape[1]):
-        integral_k, _ = quad(func=integral_for_censoring, a=0, b=b_upper, args=(scale_C, scale_T, shape_T, dist_T))
-        censoring[:,k] = 1 - integral_k
+    censoring, _ = quad(func=integral_for_censoring, a=0, b=b_upper, args=(scale_C, scale_T, shape_T, dist_T))
     return censoring
 
 
-def err2_censoring_exponential(scale_C:np.ndarray, censoring:float, scale_T:np.ndarray, shape_T:np.ndarray or None, dist_T:str, ret_squared:bool=True):
+def err2_censoring_exponential(scale_C:float, censoring:float, scale_T:float, shape_T:float, dist_T:str, ret_squared:bool=True) -> float:
     """Calculates squared error between target censoring and expected value"""
     expected_censoring = censoring_exponential(scale_C, scale_T, shape_T, dist_T)
     if ret_squared:
@@ -166,7 +162,7 @@ def find_exp_scale_censoring(censoring:float, scale_T:np.ndarray, shape_T:np.nda
     1xk vector of scale parameters for censoring exponential distribution
     """
     # (i) Input chekcs
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
     check_dist_str(dist_T)
     # (ii) Use the quantiles from each distribution
     scale_C = np.zeros(scale_T.shape)
@@ -228,7 +224,7 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     2*(n_sim x k) np.ndarray's of observed time-to-event measurements and censoring indicator
     """
     # Input checks
-    check_interval(censoring, 0, 1)
+    check_interval(censoring, 0, 1, equals_low=True)
     scale, shape = t_wide(scale), t_wide(shape)
     k = scale.shape[1]
     assert scale.shape == shape.shape, 'scale and shape need to be the same'
@@ -247,10 +243,10 @@ def rvs(n_sim:int, scale:np.ndarray, shape:np.ndarray or None, dist:str, seed:No
     return T_obs, D_cens
 
 
-class surv_dist():
+class univariate_dist():
     def __init__(self, dist:str, scale:float or np.ndarray or None=None, shape:float or np.ndarray or None=None) -> None:
         """
-        Backbone class for parametric survival distributions. Choice of distribution will determine the call of other functions.
+        Backbone class for univriate parametric survival distributions. Choice of distribution will determine the call of other functions.
 
         Inputs
         ------
@@ -284,11 +280,8 @@ class surv_dist():
         if 'exponential' in self.didx:
             idx_exp = self.didx['exponential']
             self.shape[:,idx_exp] = self.shape[:,idx_exp]*0 + 1
-        
-
-    def check_t(self, t):
-        assert len(t) == self.n, f't needs to be the same size the input parameter: {self.n}'
-
+    
+    
     def hazard(self, t):
         return hazard(t=t, scale=self.scale, shape=self.shape, dist=self.dist)
 

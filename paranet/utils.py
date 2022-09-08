@@ -7,10 +7,54 @@ import os
 import numpy as np
 import pandas as pd
 from typing import Callable
-from scipy.stats import rankdata
 
 # List of currently supported distributions
 dist_valid = ['exponential', 'weibull', 'gompertz']
+
+
+# Set up the bounds for the different distributions (shape param is redundant for exponential)
+di_bounds = {'exponential':((0, None), (0, None)),
+             'weibull':((0, None), (0, None)),
+             'gompertz':((None, None), (0, None))}
+
+
+
+def try_squeeze(x:np.ndarray, axis:int or None=None) -> np.ndarray:
+    """Implements np.sqeeze but will not squeeze axis if length > 1"""
+    if axis is not None:
+        if x.shape[axis] == 1:
+            return np.squeeze(x, axis)
+        else:
+            return x
+    else:
+        return np.squeeze(x, axis)
+
+
+def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
+    """Check that the input is approximately zero"""
+    return np.all(np.abs(x) < tol)
+
+
+def should_fail(fun, **kwargs):
+    """Test that a function evaluated for certain values fails"""
+    try:
+        failed = False
+        fun(**kwargs)
+    except:
+        failed = True
+    assert failed, 'Expected function to fail'
+
+
+def all_or_None(lst:list or np.ndarray) -> bool:
+    """Checks whether a list or array is either all None or not a single None"""
+    is_none = [z is None for z in lst]
+    not_none = [not z for z in is_none]
+    check = all(is_none) or all(not_none)
+    return check
+
+def not_none(x) -> bool:
+    """Checks that some input is not None"""
+    return x is not None
 
 
 def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -> np.ndarray:
@@ -36,16 +80,6 @@ def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -
     return grad
 
 
-
-def fast_auroc(x:np.ndarray, y:np.ndarray) -> float:
-    n_x, n_y = len(x), len(y)
-    x, y = flatten(x), flatten(y)
-    df = pd.DataFrame({'grp':np.repeat([1,0],[n_x, n_y]), 's':np.concatenate((x,y))})
-    df['r'] = rankdata(df['s'])
-    auroc = (df.query('grp==1')['r'].sum() - n_x*(n_x+1)/2) / (n_x*n_y)
-    return auroc
-
-
 def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
     """
     Wrapper to save a ggplot or patchworklib object object
@@ -69,9 +103,16 @@ def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
         print('gg is not a recordnized type')
 
 
-def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float) -> None:
-    """Check: low <= x <= high"""
-    assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
+def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:int or float, equals_both:bool=False, equals_low:bool=False, equals_high:bool=False) -> None:
+    """Check that an array or float is between low <= x <= high"""
+    if equals_low and not equals_high:
+        assert np.all((x >= low) & (x < high)), 'x is not between [low,high)'
+    elif equals_high and not equals_low:
+        assert np.all((x > low) & (x <= high)), 'x is not between [low,high)'
+    elif equals_both or (equals_low and equals_high):
+        assert np.all((x >= low) & (x <= high)), 'x is not between [low,high]'
+    else:
+        assert np.all((x > low) & (x < high)), 'x is not between (low,high)'
 
 
 def str2lst(x):
@@ -108,13 +149,35 @@ def broadcast_dist(dist:str or list, k:int):
     return dist
 
 
+def broadcast_td_dist(t:np.ndarray, d:np.ndarray, dist:str or list) -> tuple[np.ndarray, np.ndarray, list]:
+    """
+    Broadcast either the time/censor vectors or the dist. For example, if t ~ (n,1) and len(dist)=k, then t ~ (n,k)
+    """
+    # Input checks
+    assert hasattr(t, 'shape'), 't needs to be a np.ndarray'
+    assert len(t.shape) == 2, 't needs to be an (n,k) array'
+    # Do transforms
+    dist = str2lst(dist)
+    k_dist = len(dist)
+    k_t = t.shape[1]
+    if (k_dist == 1) & (k_t > 1):
+        dist = broadcast_dist(dist, k_t)
+    if (k_dist > 1) & (k_t == 1):
+        t = np.tile(t, [1,k_dist])
+        d = np.tile(d, [1,k_dist])
+    return t, d, dist
+
+
 def broadcast_long(x:np.ndarray, k:int):
     """If we have an (n,1) array, convert to an (n,k) with duplicate columns"""
     if hasattr(x, 'shape'):
         if len(x.shape) == 1:
             return np.tile(t_long(x),[1,k])
         else:
-            return np.tile(x,[1,k])
+            if x.shape[1] == 1:
+                return np.tile(x,[1,k])
+            else:
+                return x
     else:
         return np.tile(t_long(x),[1,k])
 
@@ -152,7 +215,7 @@ def is_vector(x:np.ndarray) -> None:
     assert check, 'Dimensionality not as expected'
 
 
-def get_p_k(t:np.ndarray) -> tuple[int, int]:
+def _get_p_k(t:np.ndarray) -> tuple[int, int]:
     """
     RETURN THE DIMENSIONALITY OF THE DATA INPUT ARRAY
 
@@ -180,7 +243,7 @@ def format_t_d(t:np.ndarray, d:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     ENSURES THAT TIME/CENSORING ARE IN LONG FORM, AND SCALE/SHAPE ARE IN WIDE FORM
     """
     t_vec, d_vec = t_long(t), t_long(d)
-    assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be teh same size'
+    assert t_vec.shape == d_vec.shape, 'time and censoring matrix should be the same size'
     return t_vec, d_vec
 
 
