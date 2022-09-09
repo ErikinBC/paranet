@@ -18,6 +18,18 @@ di_bounds = {'exponential':((0, None), (0, None)),
              'gompertz':((None, None), (0, None))}
 
 
+def find_nearest_decimal(x:float):
+    k = 0
+    z = np.round(x, k)
+    while z < 1:
+        k += 1
+        f = 10**k
+        z = x * f    
+    ub = np.ceil(z) / f
+    if ub == x:
+        ub = (np.ceil(z) + 1) / f
+    return ub
+
 
 def try_squeeze(x:np.ndarray, axis:int or None=None) -> np.ndarray:
     """Implements np.sqeeze but will not squeeze axis if length > 1"""

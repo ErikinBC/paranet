@@ -28,7 +28,7 @@ def test_param_consistency(n:int=1000000, p:int=5, lst_dist:list=dist_valid, n_s
         x = 0.5*np.random.randn(n,p)
         # Draw data from covariates
         enc_dgp = parametric(lst_dist, x, alpha=alpha, beta=beta, add_int=True, scale_x=False, scale_t=False)
-        t, d = enc_dgp.rvs(censoring=0, n_sim=1, seed=s)
+        t, d = enc_dgp.rvs(n_sim=1, seed=s)
         t, d = np.squeeze(t), np.squeeze(d)
         # Fit model
         enc_mdl = parametric(lst_dist, x, add_int=True, scale_x=False, scale_t=False)
@@ -41,7 +41,7 @@ def test_param_consistency(n:int=1000000, p:int=5, lst_dist:list=dist_valid, n_s
         assert bhat_err < tol_bhat, f'Largest discrepancy between actual and expected coefficient is greater than {tol_bhat}: {bhat_err:.6f} for simulation={s}'
         # (ii) Check that hazard/survival/pdf is close enough to ground-truth
         x_oos = np.random.randn(n_sim, p)
-        t_oos = np.squeeze(enc_dgp.rvs(censoring=0, n_sim=1, x=x_oos)[0])
+        t_oos = np.squeeze(enc_dgp.rvs(n_sim=1, x=x_oos)[0])
         for method in methods:
             moment_dgp = getattr(enc_dgp, method)(t_oos, x_oos)
             moment_hat = getattr(enc_mdl, method)(t_oos, x_oos)
