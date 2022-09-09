@@ -277,7 +277,9 @@ class parametric():
 
         Returns
         -------
-        []
+        [gamma_mat, thresh_min]
+        gamma_mat:          A (p,k) array of distribution specific parameters which will achieve total sparsity for a given rho
+        thresh_min:         The minimum threshold needed to get all zeros for the non-shape/scale parameters at gamma_mat
         """
         # - (i) Process inputs and do input checks - #
         t_trans, d_trans, x_trans = self._process_t_d_x(t, d, x)
@@ -287,25 +289,29 @@ class parametric():
         p, k = x_trans.shape[1], t_trans.shape[1]
         alpha_beta = np.zeros([p+1, k])
         alpha_beta[0] = shape_scale0[0]
-        if self.add_int:
-            alpha_beta[1] = shape_scale0[1]
-        grad0 = grad_ll(alpha_beta, x_trans, t_trans, d_trans, self.dist, gamma=0, rho=1)
+        if self.add_int:  # Put in log scale since exp(b0) is the new scale
+            alpha_beta[1] = np.log(shape_scale0[1])
+        # Note that the values of gamma/rho do not matter because alpha_beta is zero outside of the shape/scale rows
+        idx_beta = 1 + int(self.add_int)
+        grad0 = grad_ll(alpha_beta, x_trans, t_trans, d_trans, self.dist, gamma=0, rho=1)[idx_beta:]
+        # Calculate the largest gradient for each distribution
+        lam_max0 = np.max(np.abs(grad0),0)
         # Divide by rho
-        lam_max0 = np.max(np.abs(grad0),0) / rho
+        lam_max_rho = lam_max0 / rho
         # - (iv) Fit model to get smallest value - #
-        gamma_mat = np.zeros([p, k]) + np.atleast_2d(lam_max0)
+        gamma_mat = np.zeros([p, k]) + np.atleast_2d(lam_max_rho)
         if self.add_int:  # Set intercept to zero
             gamma_mat[0] = 0
-        self.fit(x, t, d, gamma_mat, rho, beta_ratio=1e-32)
-        if self.add_int:
-            self.beta[0] = 0
+        self.fit(x, t, d, gamma_mat, rho, beta_thresh=1e-32)
+        idx_beta = int(self.add_int)
         # Find threshold to set values to zero
-        thresh_min = find_nearest_decimal(np.abs(self.beta).max())
+        thresh_min = find_nearest_decimal(np.abs(self.beta[idx_beta:]).max())
+        self.beta[idx_beta:] = 0
         # Return values
         return gamma_mat, thresh_min        
 
 
-    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10) -> None:
+    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None) -> None:
         """
         Defines a fitting procedure to learn alpha_beta which can then be used as an inhereted attribute in methods like hazard(), rvs(), or predict()
         
@@ -333,12 +339,12 @@ class parametric():
         gamma = self._process_gamma(gamma, p)
 
         # - (ii) Run solver - #
-        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm)
+        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init)
         self.alpha = alpha_beta[[0]]
         self.beta = alpha_beta[1:]
         
         # - (iii) Apply full "sparsity" measures - #
-        idx_beta = 1 + int(self.add_int)
+        idx_beta = int(self.add_int)
         idx_thresh = np.abs(self.beta) < beta_thresh
         idx_ratio = np.abs(self.beta.max() / self.beta) > beta_ratio
         idx_drop = idx_thresh & idx_ratio

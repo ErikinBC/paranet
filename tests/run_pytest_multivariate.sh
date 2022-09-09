@@ -3,7 +3,7 @@
 # Activate conda
 conda activate paranet
 
-# Runs pytest for the univariate scripts
+# Runs pytest for the multivariate scripts
 python3 -m pytest tests/test_multivariate_dists.py 
 python3 -m pytest tests/test_multivariate_parametric.py
 python3 -m pytest tests/test_multivariate_scaling.py 

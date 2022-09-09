@@ -247,6 +247,7 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
             alpha_beta[1] = np.log(x0_intercept[1])
     else:
         assert alpha_beta.shape == alpha_beta_init.shape, f'alpha_beta_init needs to be of size {alpha_beta.shape}'
+        alpha_beta = alpha_beta_init
 
     # Run optimization for each distribution
     for i in range(k):
