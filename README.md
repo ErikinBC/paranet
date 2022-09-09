@@ -60,11 +60,13 @@ The code block below shows how to fit three parametric distributions to a single
 
 ```
 
+![toy_output](examples/basic_usage.png)
 
 ## (3) Probability distribution parameterization
 
 Each parametric survival distribution is defined by a scale ($\lambda$) and, except for the Exponential distribution, a shape ($\alpha$) parameter. Each distribution has been parameterized so that a higher value of the scale parameter indicates a higher "risk". The density functions are shown below. The scale and shape parameters must also be positive, except for the case of the Gompertz distribution where the shape parameter can be positive or negative.
 
+$$
 \begin{align*}
     f(t;\lambda, \alpha) &= \begin{cases}
         \lambda \exp\{ -\lambda t \}  & \text{ if Exponential} \\
@@ -72,7 +74,7 @@ Each parametric survival distribution is defined by a scale ($\lambda$) and, exc
         \lambda \exp\{ \alpha t \} \exp\{ -\frac{\lambda}{\alpha}(e^{\alpha t} - 1) \}  & \text{ if Gompertz} \\
     \end{cases}
 \end{align*}
-
+$$
 
 When moving from the univariate to the multivariate distribution, we assume that scale parameter takes is an exponential transform (to ensure positivity) of a linear combination of parameters ($\eta$). Optimization occurs by balancing the data likelihood with the magnitude of the coefficients ($R$), as is shown below. 
 
@@ -88,6 +90,7 @@ $$
 \end{align*}
 $$
 
+
 <br>
 
 ## (4) How is censoring calculated?
@@ -102,6 +105,8 @@ $$
 	\end{cases} \\
 	C &\sim \text{Exp}(\lambda_C) \\
 \end{align*}
+$$
+
 
 There are of course other processes that could generate censoring (such as EXAMPLE). The reason an exponential distribution is used in the censoring process is to allow for a (relatively) simple optimization problem of finding a single scale parameter ($\lambda_C$), which obtains an (asymptotic) censoring probability of $\phi$: 
 
@@ -130,11 +135,13 @@ Where $f_{i}(u)$ is the density of the target distribution evaluated at $u$, whe
 
 Unlike [`glmnet`](LINK), the `paranet` packages does not use coordinate descent (CD). Instead, this packages uses a smooth approximation of the L1-norm to allow for direct optimization with `scipy` (REF here) as shown below. Parametric survival models are not easily amenable to the iteratively-reweighted least squares (IRLS) approach used by `glmnet`, because of the presence of the shape parameter. In contract, an exponential model can be [easily fit](BLOG POST) leveraging existing CD-based elastic net solvers. Moving to proximal gradient descent would enable for direct optimization of the L1-norm loss and represents a possible future release.
 
+$$
 \begin{align*}
     R(\beta;\gamma,\rho) &= \gamma\big(\rho \| \beta_{1:} \|_1 + 0.5(1-\rho)\|\beta_{1:}\|_2^2\big) \\ 
     |\beta| &\approx \sqrt{\beta^2 + \epsilon} \\
     \frac{\partial R}{\partial \beta} &\approx \gamma\Bigg(\rho \frac{\beta}{\sqrt{\beta^2+\epsilon}} + (1-\rho)\beta\Bigg)
 \end{align*}
+$$
 
 <br>
 
