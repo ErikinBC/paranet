@@ -6,10 +6,11 @@ Contains the main
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler
 # Internal modules
-from paranet.multivariate.gradient import nll_solver
+from paranet.univariate.solvers_grad import wrapper_grad_solver
+from paranet.multivariate.gradient import nll_solver, grad_ll
 from paranet.multivariate.multi_utils import args_alpha_beta, has_args_init
 from paranet.multivariate.dists import hazard_multi, survival_multi, pdf_multi, quantile_multi, rvs_multi
-from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx
+from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx, find_nearest_decimal
 
 
 class parametric():
@@ -249,36 +250,109 @@ class parametric():
         alpha_beta = args_alpha_beta(k, p, alpha, beta, self.alpha, self.beta)
         return t_trans, x_trans, alpha_beta
 
-    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, grad_tol:float=1e-3, n_perm:int=10) -> None:
+    def _process_t_d_x(self, t:np.ndarray or None=None, d:np.ndarray or None=None, x:np.ndarray or None=None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Process t, d, & x for the fit() method"""
+        t_trans, x_trans = self._process_t_x(t, x)
+        d_trans = self._process_d(d)
+        k_t = t_trans.shape[1]
+        assert t_trans.shape == d_trans.shape, 't_trans and d_trans need to be the same shape'
+        assert k_t == len(self.dist), 'number of columns of t_trans needs to align with self.dist'
+        return t_trans, d_trans, x_trans
+
+    def _process_gamma(self, gamma:np.ndarray or float, p:int) -> np.ndarray:
+        """Ensure the regularization parameter gamma aligns with number of columns of p"""
+        gamma = np.atleast_1d(gamma)
+        if gamma.shape[0] == 1:  # Broadcast
+            gamma = np.repeat(gamma, p)
+        gamma = t_long(gamma)
+        assert gamma.shape[0] == p, 'length of gamma needs to align with the number of columns of x including the intercept'
+        if self.add_int:  # do not regularize the intercept
+            gamma[0] = 0
+        return gamma
+
+
+    def find_lambda_max(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, rho:float=1) -> tuple[np.ndarray, float]:
+        """
+        Find the gamma in which coefficients are guaranteed to be zero (which can useful for doing a hyperparameter search)
+
+        Returns
+        -------
+        [gamma_mat, thresh_min]
+        gamma_mat:          A (p,k) array of distribution specific parameters which will achieve total sparsity for a given rho
+        thresh_min:         The minimum threshold needed to get all zeros for the non-shape/scale parameters at gamma_mat
+        """
+        # - (i) Process inputs and do input checks - #
+        t_trans, d_trans, x_trans = self._process_t_d_x(t, d, x)
+        # - (ii) Solve the univariate optimization problem - #
+        shape_scale0 = wrapper_grad_solver(t_trans, d_trans, self.dist)
+        # - (iii) Find the (absolute) gradient at the intercept-values only - #
+        p, k = x_trans.shape[1], t_trans.shape[1]
+        alpha_beta = np.zeros([p+1, k])
+        alpha_beta[0] = shape_scale0[0]
+        if self.add_int:  # Put in log scale since exp(b0) is the new scale
+            alpha_beta[1] = np.log(shape_scale0[1])
+        # Note that the values of gamma/rho do not matter because alpha_beta is zero outside of the shape/scale rows
+        idx_beta = 1 + int(self.add_int)
+        grad0 = grad_ll(alpha_beta, x_trans, t_trans, d_trans, self.dist, gamma=0, rho=1)[idx_beta:]
+        # Calculate the largest gradient for each distribution
+        lam_max0 = np.max(np.abs(grad0),0)
+        # Divide by rho
+        lam_max_rho = lam_max0 / rho
+        # - (iv) Fit model to get smallest value - #
+        gamma_mat = np.zeros([p, k]) + np.atleast_2d(lam_max_rho)
+        if self.add_int:  # Set intercept to zero
+            gamma_mat[0] = 0
+        self.fit(x, t, d, gamma_mat, rho, beta_thresh=1e-32)
+        idx_beta = int(self.add_int)
+        # Find threshold to set values to zero
+        thresh_min = find_nearest_decimal(np.abs(self.beta[idx_beta:]).max())
+        self.beta[idx_beta:] = 0
+        # Return values
+        return gamma_mat, thresh_min        
+
+
+    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None) -> None:
         """
         Defines a fitting procedure to learn alpha_beta which can then be used as an inhereted attribute in methods like hazard(), rvs(), or predict()
         
         Inputs
         ------
-        x:              A (n,p) array of covariates (if None, assumes x was assigned during initialization)
-        t:              A (n,k) array of time values (if None, assumes t was assigned during initialization)
-        d:              A (n,k) array of censoring values (if None, assumes d was assigned during initialization)
-        grad_tol:           Post-convergence checks for largest gradient size allowable
-        n_perm:             Number of random pertubations to do around "optimal" coefficient vector to check that lower log-likelihood is not possible
+        x:                      A (n,p) array of covariates (if None, assumes x was assigned during initialization)
+        t:                      A (n,k) array of time values (if None, assumes t was assigned during initialization)
+        d:                      A (n,k) array of censoring values (if None, assumes d was assigned during initialization)
+        dist:                   The string or list of distributions
+        gamma:                  Regularization strength (0 is un-regularized)
+        rho:                    Percent weighting towards L1 (1 is Lasso)
+        beta_thresh:            If the absolute value of the (non-intercept) coefficients is less than beta_thresh, set to zero
+        beta_ratio:             If the absolute ratio of the (non-intercept) coefficients to the largest coefficient is less than 1/beta_ratio, set to zero
+        eps:                    Approximation for the L1-norm (default=1e-8)
+        grad_tol:               Post-convergence checks for largest gradient size allowable
+        n_perm:                 Number of random pertubations to do around "optimal" coefficient vector to check that lower log-likelihood is not possible
 
         Returns
         -------
         The (p+1,k) shape/scale covariate matrix as self.alpha_beta
         """
-        # Process inputs
-        t_trans, x_trans = self._process_t_x(t, x)
-        d_trans = self._process_d(d)
-        k_t = t_trans.shape[1]
-        # Input checks
-        assert t_trans.shape == d_trans.shape, 't_trans and d_trans need to be the same shape'
-        assert k_t == len(self.dist), 'number of columns of t_trans needs to align with self.dist'
-        # Run solver and assign to attributes
-        alpha_beta = nll_solver(x_trans, t_trans, d_trans, self.dist, self.add_int, grad_tol, n_perm)
+        # - (i) Process inputs and do input checks - #
+        t_trans, d_trans, x_trans = self._process_t_d_x(t, d, x)
+        p = x_trans.shape[1]        
+        gamma = self._process_gamma(gamma, p)
+
+        # - (ii) Run solver - #
+        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init)
         self.alpha = alpha_beta[[0]]
         self.beta = alpha_beta[1:]
-        # output checks
+        
+        # - (iii) Apply full "sparsity" measures - #
+        idx_beta = int(self.add_int)
+        idx_thresh = np.abs(self.beta) < beta_thresh
+        idx_ratio = np.abs(self.beta.max() / self.beta) > beta_ratio
+        idx_drop = idx_thresh & idx_ratio
+        self.beta[idx_beta:] = np.where(idx_drop[idx_beta:], 0, self.beta[idx_beta:])
+        
+        # - (iv) output checks - #
         assert self.beta.shape[0] == x_trans.shape[1], 'Number of rows of beta should align with the number of columns of (transformed) x'
-        assert k_t == self.beta.shape[1], 'Number of columns of beta should be the same as k'
+        assert t_trans.shape[1] == self.beta.shape[1], 'Number of columns of beta should be the same as k'
 
 
     def hazard(self, t:np.ndarray or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None) -> np.ndarray:
@@ -338,7 +412,7 @@ class parametric():
         return q_mat
 
 
-    def rvs(self, censoring:float, n_sim:int, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None, n_points:int=500, upper_constant:float=20) -> tuple[np.ndarray, np.ndarray]:
+    def rvs(self, n_sim:int, censoring:float=0, seed:int or None=None, x:np.ndarray or None=None, alpha:np.ndarray or None=None, beta:np.ndarray or None=None, n_points:int=500, upper_constant:float=20, try_squeeze:bool=True) -> tuple[np.ndarray, np.ndarray]:
         """
         Generate n_sim samples from the covariate conditional distribution.
 
@@ -355,4 +429,7 @@ class parametric():
         t, d = rvs_multi(censoring=censoring, n_sim=n_sim, alpha_beta=alpha_beta, x=x_trans, dist=self.dist, seed=seed, n_points=n_points, upper_constant=upper_constant, has_int=self.add_int)
         if not_none(self.enc_t):  # Return to original scale
             t *= self.enc_t.max_abs_
+        if t.shape[2] == 1:
+            if try_squeeze:
+                t, d = t[:,:,0], d[:,:,0]
         return t, d

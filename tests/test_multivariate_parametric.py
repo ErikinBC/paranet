@@ -24,7 +24,7 @@ def test_rvs_quantile(n:int=20, p:int=5, lst_dist:list=dist_valid, n_sim:int=250
     enc_dist = parametric(lst_dist, x=x, alpha=alpha, beta=beta, add_int=True)
 
     # Generate data to compare to quantiles
-    t, _ = enc_dist.rvs(censoring=0, n_sim=n_sim, seed=seed)
+    t, _ = enc_dist.rvs(n_sim=n_sim, censoring=0, seed=seed)
     q_emp = np.quantile(t, alpha_seq, axis=2).transpose([1,2,0])
     q_theory = enc_dist.quantile(alpha_seq, x)
     assert q_emp.shape == q_theory.shape, 'Quantile output shapes not as expected'

@@ -54,7 +54,7 @@ def test_check_censoring(n:int=250000, p:int=5, n_sim:int=1, lst_dist:list=dist_
                         j += 1
                         print(f'Iteration {j} of {n_perm}')
                         enc_dist = parametric(dist, x=x, alpha=shape, beta=beta, add_int=True)
-                        _, d = enc_dist.rvs(censoring, n_sim, n_points=n_points, upper_constant=upper_constant)
+                        _, d = enc_dist.rvs(n_sim, censoring, n_points=n_points, upper_constant=upper_constant)
                         emp_censor = 1-d.mean()
                         err_censor = np.abs(emp_censor - censoring)
                         assert err_censor < tol, f'Empirical ({emp_censor:.3f}) and expected: ({censoring:.3f}) censoring did not align by: {err_censor:.3f} for dist={dist}, b0={b0}, l2={l2:.2f}, shape={shape:.2f}, censoring={censoring}'

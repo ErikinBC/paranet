@@ -31,7 +31,7 @@ def test_scale_x(n:int=250000, p:int=5, lst_dist:list=dist_valid, tol_pct:float=
         print(f'-- Running for {dist} --')
         # (i) oracle model
         enc_oracle = parametric(dist, x_raw, alpha=alpha_raw, beta=beta_raw, scale_x=False, scale_t=False, add_int=True)
-        t_raw, d_raw = enc_oracle.rvs(0, 1, seed=n)
+        t_raw, d_raw = enc_oracle.rvs(1, seed=n)
         t_raw, d_raw = np.squeeze(t_raw), np.squeeze(d_raw)
 
         # (ii) unscaled version
@@ -77,8 +77,8 @@ def test_scale_x(n:int=250000, p:int=5, lst_dist:list=dist_valid, tol_pct:float=
             err_quantile_scale_t = np.abs(enc_scale_t.quantile(pseq, x=x_raw) / enc_oracle.quantile(pseq, x=x_raw) - 1).max()
             assert err_quantile_scale_t < tol_pct, f'Quantile values should be within {tol_pct} of the orcale: {err_quantile_scale_t:.4f}'
             # (c) Check that rvs() works
-            quant_rvs_oracle = np.quantile(enc_oracle.rvs(0,n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
-            quant_rvs_scale_t = np.quantile(enc_scale_t.rvs(0,n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
+            quant_rvs_oracle = np.quantile(enc_oracle.rvs(n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
+            quant_rvs_scale_t = np.quantile(enc_scale_t.rvs(n,seed=1,x=x_raw[:4])[0],pseq,[1,2])
             err_quant_rvs = np.abs(quant_rvs_scale_t / quant_rvs_oracle - 1).max()
             assert err_quant_rvs < tol_pct, f'Quantile values should be within {tol_pct} of the orcale: {err_quant_rvs:.4f}'
 
