@@ -18,7 +18,7 @@ di_bounds = {'exponential':((0, None), (0, None)),
              'gompertz':((None, None), (0, None))}
 
 
-def find_nearest_decimal(x:float):
+def find_nearest_decimal(x:float) -> float:
     k = 0
     z = np.round(x, k)
     while z < 1:
@@ -47,7 +47,7 @@ def close2zero(x:float or np.ndarray, tol:float=1e-10) -> None:
     return np.all(np.abs(x) < tol)
 
 
-def should_fail(fun, **kwargs):
+def should_fail(fun, **kwargs) -> None:
     """Test that a function evaluated for certain values fails"""
     try:
         failed = False
@@ -92,7 +92,7 @@ def grad_finite_differences(f:Callable, x:np.ndarray, eps:float=1e-10, **args) -
     return grad
 
 
-def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4):
+def gg_save(fn:str, fold:str, gg, width:float=5, height:float=4) -> None:
     """
     Wrapper to save a ggplot or patchworklib object object
     Inputs
@@ -127,7 +127,7 @@ def check_interval(x:np.ndarray or float or pd.Series, low:int or float, high:in
         assert np.all((x > low) & (x < high)), 'x is not between (low,high)'
 
 
-def str2lst(x):
+def str2lst(x) -> list:
     """Will convert a string to a list of length one"""
     if isinstance(x, str):
         x = [x]
@@ -136,7 +136,7 @@ def str2lst(x):
     return x
 
 
-def dist2idx(dist:list):
+def dist2idx(dist:list) -> dict:
     """
     Returns a dictionary assigning the distributions to the different column indices
     """
@@ -150,7 +150,7 @@ def dist2idx(dist:list):
     return didx
 
 
-def broadcast_dist(dist:str or list, k:int):
+def broadcast_dist(dist:str or list, k:int) -> list:
     """
     If dist is a string or list of lenght one, will make into a list of length k if scale is an (1,k) array
     """
@@ -180,7 +180,7 @@ def broadcast_td_dist(t:np.ndarray, d:np.ndarray, dist:str or list) -> tuple[np.
     return t, d, dist
 
 
-def broadcast_long(x:np.ndarray, k:int):
+def broadcast_long(x:np.ndarray, k:int) -> np.ndarray:
     """If we have an (n,1) array, convert to an (n,k) with duplicate columns"""
     if hasattr(x, 'shape'):
         if len(x.shape) == 1:
@@ -200,7 +200,7 @@ def check_dist_str(dist:str or list) -> None:
     assert all([d in dist_valid for d in dist]), f'dist must be one of: {", ".join(dist_valid)}'
 
 
-def dist2vec(dist:str or list, scale:np.ndarray):
+def dist2vec(dist:str or list, scale:np.ndarray) -> list:
     """Ensure that a string or input array is a list of length k"""
     dist = str2lst(dist)
     check_dist_str(dist)
@@ -335,7 +335,7 @@ def param2array(x:float or np.ndarray or pd.Series) -> np.ndarray:
     assert check, 'Input is not a float or coerible'
     return x
 
-def coerce_to_Series(x):
+def coerce_to_Series(x) -> pd.Series:
     """
     Try to coerce an object x to a pd.Series. Currently supported for strings, integers, floats, lists, numpy arrays, and None's. 
     """
@@ -357,7 +357,7 @@ def coerce_to_Series(x):
     return x
 
 
-def check_type(x, tt: type, name: str=None):
+def check_type(x, tt: type, name: str=None) -> None:
     """
     Function checks whether object is of type tt, with variable named name
 
@@ -397,14 +397,14 @@ def hstack_pd(x: pd.DataFrame, y: pd.DataFrame, drop_x:bool=True) -> pd.DataFram
 
 
 
-def setdiff(x: pd.Series, y: pd.Series):
+def setdiff(x: pd.Series, y: pd.Series) -> pd.Series:
     """R-like equivalent using pandas instead of numpy"""
     x = coerce_to_Series(x)
     y = coerce_to_Series(y)
     z = x[~x.isin(y)].reset_index(drop=True)
     return z
 
-def intersect(x: pd.Series, y: pd.Series):
+def intersect(x: pd.Series, y: pd.Series) -> pd.Series:
     """R-like equivalent using pandas instead of numpy"""
     x = coerce_to_Series(x)
     y = coerce_to_Series(y)
