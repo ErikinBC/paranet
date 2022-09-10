@@ -15,7 +15,7 @@ The `paranet` package allows users to fit a high-dimensional linear model on rig
 
 ## (0) Installation
 
-The `paranet` package can be installed with `pip install paranet=0.1`
+The `paranet` package can be installed with `pip install paranet=0.1`. **NOTE** this package has been tested with python 3.9+. Using earlier versions of python may lead to errors.
 <br>
 
 
@@ -58,7 +58,6 @@ The code block below shows how to fit three parametric distributions to a single
 
 ```python
 # Load modules
-import os
 import numpy as np
 import pandas as pd
 import plotnine as pn

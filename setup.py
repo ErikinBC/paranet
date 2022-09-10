@@ -6,7 +6,7 @@ README = (HERE / 'README.md').read_text()
 
 setup(
     name='paranet',
-    version='0.1.0',    
+    version='0.1.3',    
     description='paranet package',
     long_description=README,
     long_description_content_type="text/markdown",
@@ -16,7 +16,7 @@ setup(
     license='GPLv3',
     license_files = ('LICENSE.txt'),
     packages=['paranet'],
-    package_data={'paranet': ['tests/*', 'examples/*']},
+    package_data={'paranet': ['/*','multivariate/*','univariate/*','tests/*', 'examples/*']},
     include_package_data=True,
     install_requires=['numpy', 'pandas', 'scipy'],
     classifiers=[
