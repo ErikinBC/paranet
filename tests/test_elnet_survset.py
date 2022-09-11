@@ -17,6 +17,7 @@ from paranet.models import parametric
 from paranet.utils import dist_valid
 
 
+# rho = 1; n_gamma = 10; ratio_min = 0.01; grad_tol = 0.05; max_iter = 5000; chunks_iter = 1000
 def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
     # (i) Perpeare the encoding class
     enc_fac = Pipeline(steps=[('ohe', OneHotEncoder(sparse=False, drop=None, handle_unknown='ignore'))])
@@ -33,8 +34,6 @@ def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
     holder = []
     for i, ds in enumerate(lst_ds):
         print(f'- Fitting model for dataset {ds} ({i+1} of {len(lst_ds)}) -')
-        if i < 28:
-            continue
         # Load data
         df, _ = loader.load_dataset(ds).values()
         df = df.query('time > 0')
@@ -56,10 +55,11 @@ def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
             gamma_j = np.tile(np.atleast_2d(gamma_row),[mdl.beta.shape[0],1])
             prev_alpha_beta = np.vstack([mdl.alpha, mdl.beta])
             stime = time()
-            mdl.fit(gamma=gamma_j, rho=rho, beta_thresh=thresh, alpha_beta_init=prev_alpha_beta, maxiter=15000)
+            mdl.fit(gamma=gamma_j, rho=rho, beta_thresh=thresh, alpha_beta_init=prev_alpha_beta, grad_tol=grad_tol, max_iter=max_iter, chunks_iter=chunks_iter)
             pct_sparse[j] = np.mean(mdl.beta[1:] == 0)
             runtime[j] = time() - stime
         res_i = pd.DataFrame({'ds':ds, 'n':n, 'p':p, 'gamma':pct_gamma, 'sparse':pct_sparse, 'runtime':runtime})
+        res_i
         print(f'Took {runtime.sum():.0f} seconds to run\n')
         holder.append(res_i)
 
@@ -85,4 +85,7 @@ if __name__ == '__main__':
     rho = 1
     n_gamma = 10
     ratio_min = 0.01
+    grad_tol = 0.05
+    max_iter = 15000
+    chunks_iter = 1000
     test_survset(rho, n_gamma, ratio_min)

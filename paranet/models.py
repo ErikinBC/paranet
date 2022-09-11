@@ -314,7 +314,7 @@ class parametric():
         return gamma_mat, thresh_min        
 
 
-    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None, maxiter:int=15000) -> None:
+    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-4, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None, max_iter:int=15000, chunks_iter:int=1000) -> None:
         """
         Defines a fitting procedure to learn alpha_beta which can then be used as an inhereted attribute in methods like hazard(), rvs(), or predict()
         
@@ -344,18 +344,11 @@ class parametric():
         gamma = self._process_gamma(gamma, p)
 
         # - (ii) Run solver - #
-        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init, maxiter=maxiter)
+        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, beta_thresh=beta_thresh, beta_ratio=beta_ratio, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init, max_iter=max_iter, chunks_iter=chunks_iter)
         self.alpha = alpha_beta[[0]]
         self.beta = alpha_beta[1:]
-        
-        # - (iii) Apply full "sparsity" measures - #
-        idx_beta = int(self.add_int)
-        idx_thresh = np.abs(self.beta) < beta_thresh
-        idx_ratio = np.abs(self.beta.max() / self.beta) > beta_ratio
-        idx_drop = idx_thresh & idx_ratio
-        self.beta[idx_beta:] = np.where(idx_drop[idx_beta:], 0, self.beta[idx_beta:])
-        
-        # - (iv) output checks - #
+              
+        # - (iii) output checks - #
         assert self.beta.shape[0] == x_trans.shape[1], 'Number of rows of beta should align with the number of columns of (transformed) x'
         assert t_trans.shape[1] == self.beta.shape[1], 'Number of columns of beta should be the same as k'
 
