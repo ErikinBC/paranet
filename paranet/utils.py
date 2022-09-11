@@ -18,6 +18,16 @@ di_bounds = {'exponential':((0, None), (0, None)),
              'gompertz':((None, None), (0, None))}
 
 
+def check_d(d:np.ndarray) -> None:
+    """Checks that the d array is only zeros or ones"""
+    assert np.all((d == 1) | (d == 0)), 'Expected all values of d to be in {0,1}'
+
+
+def check_t(t:np.ndarray) -> None:
+    """Checks that the t array is strictly positive"""
+    assert np.all(t > 0), 'Expected all values of t to be > 0'
+
+
 def find_nearest_decimal(x:float) -> float:
     k = 0
     z = np.round(x, k)

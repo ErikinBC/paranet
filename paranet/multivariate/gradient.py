@@ -205,7 +205,7 @@ def grad_ll(alpha_beta:np.ndarray, x:np.ndarray, t:np.ndarray, d:np.ndarray, dis
 
 
 
-def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma:np.ndarray or float, rho:float, eps:float=1e-8, has_int:bool=False, grad_tol:float=1e-3, n_perm:int=10, alpha_beta_init=None) -> np.ndarray:
+def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma:np.ndarray or float, rho:float, eps:float=1e-8, has_int:bool=False, grad_tol:float=1e-3, n_perm:int=10, alpha_beta_init=None, maxiter:int=15000) -> np.ndarray:
     """
     Wrapper to find the coefficient vector which minimizes the negative log-likelihood for the different parameter survival distributions
 
@@ -256,9 +256,10 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
         t_i, d_i = t[:,i], d[:,i]
         gamma_i = gamma[:,[i]]
         bnds_i = (di_bounds[dist[i]][0],) + bnds_p
-        opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i, gamma_i, rho, eps), method='L-BFGS-B', bounds=bnds_i)
+        opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i, gamma_i, rho, eps), method='L-BFGS-B', bounds=bnds_i, options={'maxiter':maxiter})
         # Check for convergence
-        assert opt_i.success, f'Optimization was unsuccesful for {i}'
+        if opt_i.message != 'STOP: TOTAL NO. of ITERATIONS REACHED LIMIT':
+            assert opt_i.success, f'Optimization was unsuccesful for {i}: {opt_i.message}'
         grad_max_i = np.abs(opt_i.jac.flat).max()
         assert grad_max_i < grad_tol, f'Largest gradient after convergence > {grad_tol}: {grad_max_i}'
         # Do slight permutation
