@@ -3,6 +3,7 @@ Gradients for multivariate models
 """
 
 # External modules
+import warnings
 import numpy as np
 from scipy.optimize import minimize
 
@@ -250,6 +251,7 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
         alpha_beta = alpha_beta_init
 
     # Run optimization for each distribution
+    msgs = ['STOP: TOTAL NO. of f AND g EVALUATIONS EXCEEDS LIMIT', 'STOP: TOTAL NO. of ITERATIONS REACHED LIMIT']
     for i in range(k):
         x0_i = alpha_beta[:,[i]]  # Needs to be a column vector
         dist_i = [dist[i]]
@@ -258,16 +260,20 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
         bnds_i = (di_bounds[dist[i]][0],) + bnds_p
         opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i, gamma_i, rho, eps), method='L-BFGS-B', bounds=bnds_i, options={'maxiter':maxiter})
         # Check for convergence
-        if opt_i.message != 'STOP: TOTAL NO. of ITERATIONS REACHED LIMIT':
+        if opt_i.message in msgs:
+            wmsg = f'Number of iterations exceeded, returning vector as is for {dist_i} ({i})'
+            warnings.warn(wmsg)
+            alpha_beta[:,i] = opt_i.x
+        else:
             assert opt_i.success, f'Optimization was unsuccesful for {i}: {opt_i.message}'
-        grad_max_i = np.abs(opt_i.jac.flat).max()
-        assert grad_max_i < grad_tol, f'Largest gradient after convergence > {grad_tol}: {grad_max_i}'
-        # Do slight permutation
-        np.random.seed(n_perm)
-        dist_perm_i = list(np.repeat(dist_i, n_perm))
-        x_alt = t_long(opt_i.x) + np.random.uniform(-0.01,0.01,[p+1,n_perm])
-        assert np.all(opt_i.fun < log_lik(x_alt, x, t_i, d_i, dist_perm_i, gamma_i, rho, eps)), 'Small permutation around x_star yielded a lower negative log-likelihood!'
-        # Store
-        alpha_beta[:,i] = opt_i.x
+            grad_max_i = np.abs(opt_i.jac.flat).max()
+            assert grad_max_i < grad_tol, f'Largest gradient after convergence > {grad_tol}: {grad_max_i}'
+            # Do slight permutation
+            np.random.seed(n_perm)
+            dist_perm_i = list(np.repeat(dist_i, n_perm))
+            x_alt = t_long(opt_i.x) + np.random.uniform(-0.01,0.01,[p+1,n_perm])
+            assert np.all(opt_i.fun < log_lik(x_alt, x, t_i, d_i, dist_perm_i, gamma_i, rho, eps)), 'Small permutation around x_star yielded a lower negative log-likelihood!'
+            # Store
+            alpha_beta[:,i] = opt_i.x
     # Return
     return alpha_beta

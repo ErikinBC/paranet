@@ -17,7 +17,7 @@ from paranet.models import parametric
 from paranet.utils import dist_valid
 
 
-def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
+def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01, maxiter:int=1000) -> None:
     # (i) Perpeare the encoding class
     enc_fac = Pipeline(steps=[('ohe', OneHotEncoder(sparse=False, drop=None, handle_unknown='ignore'))])
     sel_fac = make_column_selector(pattern='^fac\\_')
@@ -33,12 +33,11 @@ def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
     holder = []
     for i, ds in enumerate(lst_ds):
         print(f'- Fitting model for dataset {ds} ({i+1} of {len(lst_ds)}) -')
-        if i < 28:
-            continue
         # Load data
         df, _ = loader.load_dataset(ds).values()
         df = df.query('time > 0')
         t, d = df['time'].values, df['event'].values.astype(float)
+        d = np.where(d >= 1, 1, 0)
         df.drop(columns=['pid','event','time'], inplace=True)
         # Transform and create class
         enc_i = enc_df.fit(df)
@@ -56,15 +55,17 @@ def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
             gamma_j = np.tile(np.atleast_2d(gamma_row),[mdl.beta.shape[0],1])
             prev_alpha_beta = np.vstack([mdl.alpha, mdl.beta])
             stime = time()
-            mdl.fit(gamma=gamma_j, rho=rho, beta_thresh=thresh, alpha_beta_init=prev_alpha_beta, maxiter=15000)
+            mdl.fit(gamma=gamma_j, rho=rho, beta_thresh=thresh, alpha_beta_init=prev_alpha_beta, maxiter=maxiter)
             pct_sparse[j] = np.mean(mdl.beta[1:] == 0)
             runtime[j] = time() - stime
         res_i = pd.DataFrame({'ds':ds, 'n':n, 'p':p, 'gamma':pct_gamma, 'sparse':pct_sparse, 'runtime':runtime})
-        print(f'Took {runtime.sum():.0f} seconds to run\n')
         holder.append(res_i)
 
     # (iii) Combine datasets and plot
-    res = pd.concat(holder).assign(sparse=lambda x: x['sparse']*100)
+    res = pd.concat(holder).assign(sparse=lambda x: x['sparse']*100).reset_index(drop=True)
+    res = res.assign(dsparse=lambda x: x.groupby('ds')['sparse'].diff().fillna(0))
+    mu_error = np.mean(res.query('gamma < 1')['dsparse'] > 0)
+    print(f'A total of {100*mu_error:.1f}% of calculations had sparsity increase')
     res = res.melt(['ds','n','p','gamma'],None,'msr')
     di_msr = {'sparse':'Sparse (%)', 'runtime':'Runtime (seconds)'}
     import os
@@ -77,7 +78,7 @@ def test_survset(rho:float=1, n_gamma:int=10, ratio_min:float=0.01) -> None:
         pn.scale_x_continuous(labels=percent_format()) + 
         pn.theme(subplots_adjust={'wspace': 0.25}) + 
         pn.geom_line(color='blue',alpha=0.5))
-    gg_survset.save(os.path.join(os.getcwd(),'tests','figures','survset.png'),width=8,height=3)
+    gg_survset.save(os.path.join(os.getcwd(),'tests','figures','survset.png'),width=12,height=3)
 
 
 if __name__ == '__main__':
@@ -85,4 +86,7 @@ if __name__ == '__main__':
     rho = 1
     n_gamma = 10
     ratio_min = 0.01
-    test_survset(rho, n_gamma, ratio_min)
+    maxiter = 1000
+    test_survset(rho, n_gamma, ratio_min, maxiter)
+
+    print('~~~ End of test_elnet_survset.py ~~~')
