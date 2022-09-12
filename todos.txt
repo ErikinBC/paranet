@@ -1,3 +1,13 @@
+Fixes before package goes live
+1) hyperparameter tuning notebook
+2) add option to run python3 -m to the run_pytest_.sh files
+3) fix issues with run_pytest_multivariate: tests/test_multivariate_scaling.py
+4) Add sksurv and other packages to readme
+5) Full commit on pypi (test on local conda env)
+6) Prepare blog post
+7) tweet about it
+
+
 Methods that still need to be implemented:
 
 1. Vectorized hazard/survival/pdf calculations for an arbitrary length of t (i.e. broadcast rows of x)
@@ -8,4 +18,7 @@ Methods that still need to be implemented:
 6. Proximal gradient descent
 7. Log-normal and other distributions (non-monotonic hazard)
 8. Active set speedups
-
+9. Compare solution path to sksurv
+from sksurv.util import Surv
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+10. Need a more elegant way to try different optimization routines. Should be an internal method like (try_optim(approach-'l-bfgs-g')) with a for loop around methods ('nelder-mead','SLSQP', etc)

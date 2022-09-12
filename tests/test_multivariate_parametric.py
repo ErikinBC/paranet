@@ -93,3 +93,5 @@ if __name__ == "__main__":
     tol = 0.1
     seed = 1
     test_rvs_quantile(n=n, p=p, lst_dist=dist_valid, n_sim=n_sim, tol=tol, seed=seed)
+
+    print('~~~ End of test_multivariate_parametric.py ~~~')

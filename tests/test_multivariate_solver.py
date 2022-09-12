@@ -58,3 +58,5 @@ if __name__ == '__main__':
     n, p, n_sim = 1000000, 5, 10
     tol_bhat, tol_moment = 0.02, 0.03
     test_param_consistency(n, p, dist_valid, n_sim, tol_bhat, tol_moment)
+
+    print('~~~ End of test_multivariate_solver.py ~~~')

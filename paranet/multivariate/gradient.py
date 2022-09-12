@@ -267,6 +267,10 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
         else:
             assert opt_i.success, f'Optimization was unsuccesful for {i}: {opt_i.message}'
             grad_max_i = np.abs(opt_i.jac.flat).max()
+            if grad_max_i > grad_tol:
+                print('Running SLSQP backup')
+                opt_i = minimize(fun=log_lik, jac=grad_ll, x0=x0_i, args=(x, t_i, d_i, dist_i, gamma_i, rho, eps), method='SLSQP', bounds=bnds_i, options={'maxiter':maxiter})
+                grad_max_i = np.abs(opt_i.jac.flat).max()
             assert grad_max_i < grad_tol, f'Largest gradient after convergence > {grad_tol}: {grad_max_i}'
             # Do slight permutation
             np.random.seed(n_perm)

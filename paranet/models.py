@@ -351,7 +351,7 @@ class parametric():
         # - (iii) Apply full "sparsity" measures - #
         idx_beta = int(self.add_int)
         idx_thresh = np.abs(self.beta) < beta_thresh
-        idx_ratio = np.abs(self.beta.max() / self.beta) > beta_ratio
+        idx_ratio = np.abs(self.beta.max() / self.beta) >= beta_ratio
         idx_drop = idx_thresh & idx_ratio
         self.beta[idx_beta:] = np.where(idx_drop[idx_beta:], 0, self.beta[idx_beta:])
         
