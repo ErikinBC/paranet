@@ -6,7 +6,7 @@ README = (HERE / 'README.md').read_text()
 
 setup(
     name='paranet',
-    version='0.1.3',    
+    version='0.1.4',    
     description='paranet package',
     long_description=README,
     long_description_content_type="text/markdown",
