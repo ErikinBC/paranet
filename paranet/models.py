@@ -10,7 +10,7 @@ from paranet.univariate.solvers_grad import wrapper_grad_solver
 from paranet.multivariate.gradient import nll_solver, grad_ll
 from paranet.multivariate.multi_utils import args_alpha_beta, has_args_init
 from paranet.multivariate.dists import hazard_multi, survival_multi, pdf_multi, quantile_multi, rvs_multi
-from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx, find_nearest_decimal
+from paranet.utils import broadcast_dist, broadcast_long, check_dist_str, all_or_None, t_long, str2lst, check_type, not_none, t_wide, dist2idx, find_nearest_decimal, check_d, check_t
 
 
 class parametric():
@@ -85,6 +85,8 @@ class parametric():
         self.enc_t = None
         if self.has_dt:
             self.t, self.d = t_long(t), t_long(d)
+            check_d(self.d)
+            check_t(self.t)
             self.k_t = self.t.shape[1]
             assert self.t.shape == self.d.shape, 't and d need to be the same shape'
             if self.scale_t:
@@ -162,6 +164,7 @@ class parametric():
             t = t_long(t)
         else:
             t = self.t.copy()
+        check_t(t)
         # (possibly) scale time measurements
         if self.scale_t:
             if not_none(self.enc_t):  # Use the existing encoder
@@ -179,7 +182,7 @@ class parametric():
             d = t_long(d)
         else:
             d = self.d.copy()
-        assert np.all((d == 1) | (d == 0)), 'Expected all values of d to be in {0,1}'
+        check_d(d)
         # (possibly) scale time measurements
         d = broadcast_long(d, self.k)
         return d
@@ -311,7 +314,7 @@ class parametric():
         return gamma_mat, thresh_min        
 
 
-    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None) -> None:
+    def fit(self, x:np.ndarray or None=None, t:np.ndarray or None=None, d:np.ndarray or None=None, gamma:np.ndarray or float=0, rho:float=1, beta_thresh:float=1e-6, beta_ratio:float=1, eps:float=1e-8, grad_tol:float=0.005, n_perm:int=10, alpha_beta_init=None, maxiter:int=15000) -> None:
         """
         Defines a fitting procedure to learn alpha_beta which can then be used as an inhereted attribute in methods like hazard(), rvs(), or predict()
         
@@ -328,6 +331,8 @@ class parametric():
         eps:                    Approximation for the L1-norm (default=1e-8)
         grad_tol:               Post-convergence checks for largest gradient size allowable
         n_perm:                 Number of random pertubations to do around "optimal" coefficient vector to check that lower log-likelihood is not possible
+        alpha_beta_init:        Values to initialize the solver at
+        
 
         Returns
         -------
@@ -339,14 +344,14 @@ class parametric():
         gamma = self._process_gamma(gamma, p)
 
         # - (ii) Run solver - #
-        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init)
+        alpha_beta = nll_solver(x=x_trans, t=t_trans, d=d_trans, dist=self.dist, rho=rho, gamma=gamma, eps=eps, has_int=self.add_int, grad_tol=grad_tol, n_perm=n_perm, alpha_beta_init=alpha_beta_init, maxiter=maxiter)
         self.alpha = alpha_beta[[0]]
         self.beta = alpha_beta[1:]
         
         # - (iii) Apply full "sparsity" measures - #
         idx_beta = int(self.add_int)
         idx_thresh = np.abs(self.beta) < beta_thresh
-        idx_ratio = np.abs(self.beta.max() / self.beta) > beta_ratio
+        idx_ratio = np.abs(self.beta.max() / self.beta) >= beta_ratio
         idx_drop = idx_thresh & idx_ratio
         self.beta[idx_beta:] = np.where(idx_drop[idx_beta:], 0, self.beta[idx_beta:])
         

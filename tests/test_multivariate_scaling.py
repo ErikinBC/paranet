@@ -90,4 +90,4 @@ if __name__ == '__main__':
     tol_pct, tol_method = 0.05, 0.085
     test_scale_x(n, p, dist_valid, tol_pct, tol_method)
 
-
+    print('~~~ End of test_multivariate_scaling.py ~~~')

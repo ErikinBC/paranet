@@ -1,9 +1,24 @@
+Fixes before package goes live
+1) hyperparameter tuning notebook
+2) add option to run python3 -m to the run_pytest_.sh files
+3) fix issues with run_pytest_multivariate: tests/test_multivariate_scaling.py
+4) Add sksurv and other packages to readme
+5) Full commit on pypi (test on local conda env)
+6) Prepare blog post
+7) tweet about it
+
+
 Methods that still need to be implemented:
 
 1. Vectorized hazard/survival/pdf calculations for an arbitrary length of t (i.e. broadcast rows of x)
-2. Censoring based on log-normal which uses the means of the columns rather than assuming a standard normal.
-3. Proximal gradient descent
-4. Coordinate descent for the univariate optimization
+2. Vectorize the beta_thresh input/output
+3. Censoring based on log-normal which uses the means of the columns rather than assuming a standard normal.
+4. Coordinate descent for the univariate optimization (check if similar to Nelder-Mead)
 5. Experiments with IRLS for Hessian/2nd order optimization
-6. Log-normal and other distributions
-
+6. Proximal gradient descent
+7. Log-normal and other distributions (non-monotonic hazard)
+8. Active set speedups
+9. Compare solution path to sksurv
+from sksurv.util import Surv
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+10. Need a more elegant way to try different optimization routines. Should be an internal method like (try_optim(approach-'l-bfgs-g')) with a for loop around methods ('nelder-mead','SLSQP', etc)

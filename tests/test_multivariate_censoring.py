@@ -73,3 +73,4 @@ if __name__ == "__main__":
     seed = 1
     test_check_censoring(n, p, n_sim, dist_valid, n_points, upper_constant, tol, seed)
     
+    print('~~~ End of test_multivariate_censoring.py ~~~')

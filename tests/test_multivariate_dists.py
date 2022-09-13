@@ -80,3 +80,5 @@ if __name__ == "__main__":
 
     # (ii) Check the quantile function
     test_broadcast_quantile()
+
+    print('~~~ End of test_multivariate_dists.py ~~~')

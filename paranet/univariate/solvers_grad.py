@@ -127,8 +127,8 @@ def wrapper_grad_solver(t:np.ndarray, d:np.ndarray, dist:str or list, x0:None or
                     # (iii) Try bounded optimzation with different initializations
                     opt_i = minimize(fun=log_lik_vec, jac=grad_ll_vec, x0=f*x0_i, method='L-BFGS-B', args=(t_i, d_i, dist_i), bounds=bnds_i)
                     third_success = opt_success(opt_i, tol_grad)
-                    if third_success:
-                        break
-                assert third_success, 'Unable to obtain convergence!'
+                    if not third_success:
+                        opt_i = minimize(fun=log_lik_vec, x0=x0_i, method='nelder-mead', args=(t_i, d_i, dist_i), bounds=bnds_i)
+                        assert opt_i.success, 'Unable to obtain convergence!'
         shape_scale[:,i] = opt_i.x
     return shape_scale

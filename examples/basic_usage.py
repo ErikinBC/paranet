@@ -55,3 +55,6 @@ gg_res = (pn.ggplot(res, pn.aes(x='time', y='value', color='dist')) +
     pn.scale_color_discrete(name='Distribution') + 
     pn.facet_grid('method~sample',scales='free',labeller=pn.labeller(sample=pn.label_both)))
 gg_res.save(os.path.join(os.getcwd(),'examples','basic_usage.png'), width=7, height=5)
+
+
+print('~~~ End of basic_usage.py ~~~')
