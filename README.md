@@ -16,7 +16,7 @@ The `paranet` package allows users to fit a high-dimensional linear model on rig
 
 ## (0) Installation
 
-The `paranet` package is available on PyPi and can be installed with `pip install paranet=0.1.4`. **NOTE** this package has been tested with python 3.9+. Using earlier versions of python may lead to errors.
+The `paranet` package is available on [PyPi](https://pypi.org/project/paranet/0.1.4/) and can be installed with `pip install paranet=0.1.4`. **NOTE** this package has been tested with python 3.9+. Using earlier versions of python may lead to errors.
 
 <br>
 
