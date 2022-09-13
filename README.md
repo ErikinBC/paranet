@@ -1,21 +1,23 @@
 # paranet: Parametric survival models with elastic net regularization
 
-The `paranet` package allows for the fitting of parametric survival models with right-censoring that have an L1 & L2 regularization penalty (elastic net) in `python` with an `sklearn`-like syntax. There are three parametric distributions which currently supported:
+The `paranet` package allows for the fitting of elastic net regularized parametric survival models with right-censored time-to-event data in `python`. There are three parametric distributions which currently supported:
 
 1. Exponential
 2. Weibull
 3. Gompertz
 
-These distributions were chosen due to the frequency of use in empirical research and the range of hazard distributions they can model. Additionally, they samples can be drawn cheaply using the inverse method allowing quantile and random data generation methods to run in a trivial amount of time. 
+These distributions were chosen due to their common usage in practice and for their computational simplicity since sampling and quantile calculations can be done trivially with the inverse method. 
 
-Parametric model support currently exists with the X and Y packages, but none of these packages support regularization. Elastic net survival models can be fit with Z, but this is only for the Cox-PH model. While the Cox model is a very important tool for survival modelling, its key limitation for large-scale datasets is that i) it is unable to easily do inference on individual survival times, and ii) its loss function is non-parametric and has a run-time that grows O(n^2) rather than O(n).
+Parametric model support currently exists with the [`lifelines`](https://lifelines.readthedocs.io) and [`pysurvival`](https://square.github.io/pysurvival) packages, but these packages do not support regularization for these model classes. Elastic net survival models can be fit with the [`scikit-survival`](https://scikit-survival.readthedocs.io/en/stable/) package, but this is only for the Cox-PH model. While the Cox model is a very important tool for survival modelling, its key limitation for large-scale datasets is that i) it is not natively able to do inference on individual survival times, and ii) its loss function is non-parametric in that its run-time grows O(n^2) rather than O(n).
 
-The `paranet` package allows users to fit a high-dimensional linear model on right-censored data and then provide individualized or group predictions on time-to-event outcomes. Fitting a parametric model on customer churn data can allow a data science to answer interesting questions such as: "out of these 100 customers, when do we first expect that 10% of them will have churned?", or "for this new customer, at what time point are they are highest risk of leaving us (i.e. maximum hazard)?", or "for an existing customer, what is the probability they will have churned in 10 months from now?".
+The `paranet` package allows users to fit a high-dimensional linear model on right-censored data and then provide individualized or group predictions on time-to-event outcomes. For example, fitting a parametric model on customer churn data can allow a data science to answer interesting questions such as: "out of these 100 customers, when do we first expect that 10% of them will have churned?", or "for this new customer, at what time point are they at highest risk of leaving us (i.e. maximum hazard)?", or "for an existing customer, what is the probability they will have churned in 10 months from now?".
+
 <br>
 
 ## (0) Installation
 
-The `paranet` package can be installed with `pip install paranet=0.1`. **NOTE** this package has been tested with python 3.9+. Using earlier versions of python may lead to errors.
+The `paranet` package is available on PyPi and can be installed with `pip install paranet=0.1.4`. **NOTE** this package has been tested with python 3.9+. Using earlier versions of python may lead to errors.
+
 <br>
 
 
@@ -26,7 +28,7 @@ The `parametric` class is the workhouse model of this package. When initializing
 Although each input argument is defined in the docstrings, several parameters will recur frequently throughout and are defined here for convenience.
 
 1. `x`: An `(n,p)` array of covariates. Users can either manually add an intercept and scale the data, or set `add_int=True` and `scale_x=True`.
-2. `t`: An `(n,k)` array of time measurements that should be non-zero. If $k\geq 0$ then model assumes each column corresponds to a (potentially) different distribution.
+2. `t`: An `(n,k)` array of time measurements that should be non-zero. If $k\geq 0$ then the model assumes each column corresponds to a (potentially) different distribution.
 3. `d`: An `(n,k)` array of censoring indicators whose values should be either zero or one. As is the usual convention, 0 corresponds to a censored observation and 1 to an un-censored one.
 4. `gamma`: The strength of the regularization (see section (2) for a further description). If this variable is a vector or a matrix, it must correspond to the number of columns of `x` (including the intercept if it is given).
 5. `rho`: The relative L1/L2 strength, where 0 corresponds to L2-only (i.e. Ridge regression) and 1 corresponds to L1-only (i.e. Lasso). 
@@ -126,7 +128,7 @@ $$
 \end{align*}
 $$
 
-When moving from the univariate to the multivariate distribution, we assume that scale parameter takes is an exponential transform (to ensure positivity) of a linear combination of parameters ($\eta$). Optimization occurs by balancing the data likelihood with the magnitude of the coefficients ($R$), as is shown below. 
+When moving from the univariate to the multivariate distribution, we assume that scale parameter takes is an exponential transform (to ensure positivity) of a linear combination of parameters: $\eta$. Optimization occurs by balancing the data likelihood with the magnitude of the coefficients, $R$: 
 
 $$
 \begin{align*}
@@ -158,7 +160,7 @@ $$
 $$
 
 
-There are of course other processes that could generate censoring (such as EXAMPLE). The reason an exponential distribution is used in the censoring process is to allow for a (relatively) simple optimization problem of finding a single scale parameter ($\lambda_C$), which obtains an (asymptotic) censoring probability of $\phi$: 
+There are of course other processes that could generate censoring (such as type-I censoring where all observations are censored at a pre-specified point). The reason an exponential distribution is used in the censoring process is to allow for a (relatively) simple optimization problem of finding a single scale parameter, $\lambda_C$, which obtains an (asymptotic) censoring probability of $\phi$: 
 
 $$
 \begin{align*}
@@ -197,4 +199,4 @@ $$
 
 ## (6) Making contributions
 
-If you are interested in making contributions to this package feel free to email me or make a pull request. The main classes and functions of this package have received significant unit testing and to ensure that changes do not break the package, it is recommended running `source tests/run_pytest_{univariate,multivariate,elnet}.sh` before making any final merges. This package was built with a specific conda environment and developers can use `conda env create -f paranet.yml` and then `conda activate paranet`.
+If you are interested in making contributions to this package feel free to email me or make a pull request. The main classes and functions of this package have received significant unit testing and to ensure that changes do not break the package, it is recommended running `source run_tests.sh` before making any pull requests. This package was built with a specific conda environment and developers can use `conda env create -f paranet.yml` and then `conda activate paranet`.
