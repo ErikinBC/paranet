@@ -265,6 +265,10 @@ def nll_solver(x:np.ndarray, t:np.ndarray, d:np.ndarray, dist:list or str, gamma
             warnings.warn(wmsg)
             alpha_beta[:,i] = opt_i.x
         else:
+            if not opt_i.success:
+                breakpoint()
+                log_lik(x0_i, x, t_i, d_i, dist_i, gamma_i, rho, eps)
+                grad_ll(x0_i, x, t_i, d_i, dist_i, gamma_i, rho, eps)
             assert opt_i.success, f'Optimization was unsuccesful for {i}: {opt_i.message}'
             grad_max_i = np.abs(opt_i.jac.flat).max()
             if grad_max_i > grad_tol:

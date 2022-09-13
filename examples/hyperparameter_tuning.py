@@ -36,7 +36,7 @@ frac_test, seed = 0.2, 1
 t_train, t_test, d_train, d_test, x_train, x_test = train_test_split(t_raw, d_raw, df, test_size=frac_test, random_state=seed, stratify=d_raw)
 rho_seq = np.arange(0.2, 1.01, 0.2).round(2)
 n_gamma = 50
-gamma_frac = 0
+gamma_frac = 0.001
 
 # (iv) Make "out of fold" predictions
 n_folds = 10
@@ -61,7 +61,7 @@ for i, (train_idx, val_idx) in enumerate(skf_train.split(t_train, d_train)):
         gamma_mat, thresh = mdl_para.find_lambda_max(mat_fit, t_fit, d_fit, rho=rho)
         p = gamma_mat.shape[0]
         gamma_max = gamma_mat.max(0)
-        gamma_mat = np.exp(np.linspace(np.log(gamma_max), np.log(gamma_frac*gamma_max), n_gamma-1))
+        gamma_mat = np.exp(np.linspace(np.log(gamma_max), np.log(gamma_frac*gamma_max), n_gamma-1))        
         gamma_mat = np.vstack([gamma_mat, np.zeros(gamma_mat.shape[1])])
         for j in range(n_gamma):
             gamma_j = np.tile(gamma_mat[[j]], [p,1])
@@ -103,3 +103,6 @@ t_haz_test = np.repeat(np.median(t_train), len(t_test))
 hazhat_para = mdl_para.hazard(t_haz_test, mat_test)[:,idx_dist_star]
 conc_para = concordance(d_test==1, t_test, hazhat_para)[0]
 print(f'Out of smaple conconcordance: {conc_para*100:.1f}%')
+
+
+print('~~~ End of hyperparameter_tuning.py ~~~')

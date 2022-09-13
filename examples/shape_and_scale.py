@@ -37,3 +37,5 @@ gg_shape_scale = (pn.ggplot(res, pn.aes(x='t',y='np.log(hazard)',color='shape',g
     pn.facet_grid('dist ~ scale',labeller=pn.labeller(scale=pn.label_both)))
 gg_shape_scale.save(os.path.join(os.getcwd(),'examples','shape_scale.png'),width=9,height=7)
 
+
+print('~~~ End of shape_and_scale.py ~~~')
